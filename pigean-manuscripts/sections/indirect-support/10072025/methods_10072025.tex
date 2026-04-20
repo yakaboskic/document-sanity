@@ -1,0 +1,268 @@
+\section{Methods}\label{sec:methods}
+
+\subsection{PIGEAN Model}
+\hypertarget{pigeanpior}{The} PIGEAN model specifies that (a) a subset of genes are ``relevant" to a trait and (b) the probability a gene is relevant to a trait is affected (additively) by the gene’s annotations. Specifically, for an arbitrary trait $T$ and genes $g_i\ldots g_N$, let $d_i \in\{0,1\}$ indicate whether gene $i$ is involved in $T$ and let $y_i=\Pr(d_i=1)$. Given a set of (binary or real valued) annotations $X_{ij}$ (where $j=1\dots M$) for $g_i$, we then model:
+\[
+\log\frac{y_i}{1-y_i} = \sum_j X_{ij}\beta_j + \alpha_i + \log\frac{\pi}{1-\pi} 
+\]
+\begin{align*}
+\beta_j \sim \delta_j\mathbf{N}(0, \sigma_j^2) \quad
+\alpha_i = \alpha\sum_j X_{ij} \quad
+\sigma_j^2 = \sigma^2\text{Var}_i(X_{ij})^w \quad
+\delta_j \sim \text{Bern}(p) \quad
+\end{align*}
+where $\pi$ is the prior probability that a gene is involved in disease, which we typically set to 0.05 ($\sim 1000$ genes) for complex traits and 0.01 ($\sim 200$ genes) for rare diseases, and the four parameters ($\alpha$, $\sigma$, $w$, and $p$) enforce regularization: $\sigma$ and $w$ penalize high variance (i.e. “large”) genes and annotations, $\sigma$ shrinks gene annotation effect sizes, and $p$ enforces sparsity of gene annotation effect sizes. As described in the Online Methods, we learn $p$ from the input data for trait $T$, set $w$ and $\alpha$ to limit dependence of estimands on the variance of annotations or genes, and set $\sigma$ to an empirically determined large trait-independent value (learning trait-specific $\sigma$ values is possible but, empirically, has little impact on results and introduces the potential for less robustness during model application across many traits).
+
+We do not know $d_i$ or $\beta_j$ (they are latent variables), but we can jointly infer them conditional upon observed genetic association statistics $\mathcal{S}$. By employing Gibbs sampling, we can sample from this distribution $\prob(d, \beta \mid \mathcal{S})$ if we can sample from $\prob(d \mid \beta, \mathcal{S})$ and $\prob(\beta \mid d, \mathcal{S})=\prob(\beta \mid d)$. We can apply previous ideas[] to sample from $\prob(\beta \mid d)$ (Methods), and we consider four types of genetic association statistics of increasing complexity for calculating the conditional probability $\prob(d \mid \beta, \mathcal{S})$: rare diseases in which a subset of disease-relevant genes are "known", WES gene-level burden test statistics, genome-wide SNP summary statistics from a GWAS, and a list of only significant SNPs from a GWAS. More complicated scenarios including multiple types of summary statistics (e.g. GWAS summary statistics alongside WES burden tests of ultra-rare variants) can be handled in a straightforward manner, provided the summary statistics are independent (see Methods).
+
+In the rare disease scenario, we assume that we are given $\prob(d \mid \mathcal{S})$, either fixed to a high value for a small number of "known" genes or estimated from qualitative confidence "tiers"[].  It is straightforward (Methods) to show that the log of the conditional odds of $d_i$ is the sum of its prior odds conditional upon $\beta$ and the unconditional gene bayes factor (which can be calculated from $\prob(d \mid \mathcal{S})$ and $\pi$), under the assumption that gene annotations included in the model are not influenced by knowledge of disease genes for $T$ (we investigate the feasibility of this assumption and the consequences of its violation below). In the WES scenario, the calculations are identical except, rather than being given $\prob(d \mid \mathcal{S})$ and converting it to gene bayes factors, we estimate the gene bayes factors from the burden effect sizes and standard errors using an approach previously developed for SNPs (Methods).
+
+In the genome-wide GWAS summary statistics scenario, we calculate $\prob(d \mid \beta, \mathcal{S})$ using an extension of the HuGE calculator, a previously proposed set of simple rules to estimate gene-level probabilities of disease relevance conditional upon nearby SNP associations (Methods). The extensions we use within PIGEAN (referred to as HuGEX; see Methods) address some of the obvious limitations of the HuGE calculator while preserving its advantages (simplicity, speed, and interpretability). In the  scenario of partial GWAS summary statistics, we apply the HuGEX model to all genes nearby SNPs with summary statistics available, and set the remaining genes to have $\prob(d \mid \beta, \mathcal{S})=\prob(d \mid \beta)$. 
+
+The joint posterior distribution $\Pr(d,\beta|\mathcal{S})$ inferred by PIGEAN can be distilled into four sets of summary statistics (Methods): $E[\beta_j]$, the effect size for the $j^{th}$  gene annotation; $ABF^I_i$, the “indirect” approximate Bayes Factor (ABF) that represents evidence from the annotations for gene $g_i$; $ABF^D_i$, the “direct” ABF that represents evidence from genetic associations for gene $g_i$; and $ABF_i$, the combined $ABF$ for gene $g_i$. The overall probability of disease relevance for a gene can then be expressed straightforwardly as a function of $ABF_i$ and the prior $\pi$. 
+
+These equations offer three interpretations of the PIGEAN model (Methods). In the "prinicpled priors" interpretation, the posterior probability of a gene's disease relevance is estimated using genetic associations as data ($ABF_i^D$) and the annotations to adjust the prior (a combination of $ABF_i^I$ and $\pi$), offering bayesian approach to use both genetic associations and gene annotations to prioritize genes. In the "bottom-up" interpretation, PIGEAN generalizes the popular PoPS approach; it can be shown (Methods) that if MAGMA Z-scores are used to estimate the log-odds of $ABF_i^D$, sparsity constraints on the $\beta_j$ values are replaced by L2 regularization, and full Gibbs sampling from the posterior is replaced by a single regression, then PIGEAN reduces to PoPS --- these alterations elucidate the quantity PoPS  estimates as well as the approximations in inference and data that it makes. Finally, the "indirect genetic support" interpretation of PIGEAN demonstrates that genetic support is due not only to genetic associations nearby a gene ($ABF_i^D$) but also to genetic associations nearby other genes ($ABF_i^I$) that indirectly support the gene through shared annotations.
+
+We implemented PIGEAN as a Python program and applied it to XXX full summary statistic GWAS datasets from the Association to Function Knowledge Portal, lists of reported significant GWAS associations for X traits from the GWAS catalog, X WES burden statistic datasets from XXX, and XXX rare disease gene lists from Orphanet (\textbf{Supplementary Table 1}). For validation purposes, we also analyzed 20 simulated “null” GWAS in which all SNPs had zero true effect sizes, and 10 simulated GWAS in which SNPs had true effect sizes consistent with the PIGEAN model (Methods). We considered a total of 144,627 gene annotations, including (Supplementary Table 2) knockout mouse phenotypes (11,502 Mammalian Phenotype Ontology terms), membership in gene sets and pathways (29,003 gene sets from the Molecular Signatures Database), occurrence in a PubMedCentral manuscript figure (19,391 gene sets from the Pathway Figure OCR project), co-occurrence with terms in PubMed abstracts (25,126 MeSH terms), network interaction partners (37,156 gene neighbors from STRING), and single-cell gene expression patterns (41,840 experiment clusters curated as part of the PoPS method).
+
+% \subsection{PIGEAN Model Overview}
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{figures/PIGEAN-Plates.png}
+%     \caption{The full PIGEAN model.}
+%     \label{fig:pigean-model}
+% \end{figure}
+
+% Our method, PIGEAN (\textbf{P}riors \textbf{I}nferred from \textbf{GE}ne \textbf{AN}notations), integrates direct genetic evidence with gene annotations to infer the relevance of genes to a given trait. This approach mirrors how a researcher might weigh both prior knowledge and direct genomic evidence when evaluating gene-disease relevance (Figure~\ref{fig:pigean-concept}). However, unlike a biomedical researcher, PIGEAN unifies these direct and indirect components under a robust probabilistic framework, providing an interpretable method for prioritizing genes for further investigation. In this section, we will briefly introduce these concepts and their formulation within the PIGEAN model (see Methods for a complete treatment). 
+
+% \paragraph{Direct Genetic Support}
+% For a given trait $T$ and genes $g_1, \dots, g_N$, let $d_i \in \{0,1\}$ indicate whether gene, $g_i$, is relevant to a trait ($d_i=1)$ or not ($d_i=0$). PIGEAN is capable of integrating direct genetic support from a variety of data sources including summary statistics from genetic association studies, WES burden tests, or even from curated disease genes or confidence tiers. In all cases, we will refer to direct genetic support ($\mathcal{S})$ as providing evidence for $d_i$, denoted $\text{Pr}(d_i \mid \mathcal{S})$. 
+
+% We quantify this evidence using a direct approximate Bayes factor (ABF), denoted $ABF^D_i$, which represents the probability of $d_i=1$ versus $d_i=0$ based solely on genetic associations. Depending on the data source of $\mathcal{S}$, $ABG^D_i$ is calculated as follows:
+% \begin{itemize}
+%     \item \textbf{GWAS summary statistics:} $ABF_I^D$ is calculated using an extension of the HuGE calculator [], which calculates SNP-level associations into gene-level probabilities (referred to as HuGEX?).
+%     \item \textbf{WES burden tests:} $ABF_i^D$ is estimated using effect sizes and standard errors from gene-level burden tests. 
+%     \item \textbf{Rare disease gene lists:} $ABF_i^D$ is derived from prior probabilities of gene relevance, informed by known disease genes or confidence tiers. 
+% \end{itemize}
+
+% From these direct approximate Bayes Factors, a posterior probability of gene relevance to a trait can be calculated by combining these Bayes Factors with an appropriate prior probability, denoted $\hat{\pi}$, of trait relevance to yield (see Methods for complete derivation):
+% \begin{equation} \label{eq:direct_BF}
+%     P(d_i \mid \mathcal{S}, \hat{\pi}) = \frac{ABF_i^D \cdot \hat{\pi}}{ABF_i^D\cdot \hat{\pi} + (1-\hat{\pi})}
+% \end{equation}
+
+% where it might be a reasonable assumption to set $\hat{\pi} = 0.05$ for complex traits corresponding to $\sim 1000$ genes being relevant and $\hat{\pi}=0.01$ for rare disease corresponding to $\sim 200$ genes being relavent for a rare disease. The key insight of PIGEAN, is that it is possible to use ``indirect" knowledge from gene annotations to yield a more informed prior probablity, $\hat{\pi}$ in Equation \ref{eq:direct_BF}. 
+
+% \paragraph{Indirect Support through Shared Gene Annotations}
+% For a given gene, $g_i$, let $\mathbf{X}_i$ denote the set of all available annotations for $g_i$. These annotations can be viewed as gene sets curated from pathways databases, RNAseq enrichments, or any other modality in which genes share some function or association as determined by experiment or analysis. In this way, we can view $\mathbf{X}_i$ as a proxy for all the prior knowledge we know about or wish to consider for each gene. Next, let $X_{ij} \in \mathbf{X}_i$ represent the $j$-th annotation of gene $g_i$, such that $X_{ij}$ may be binary (inclusion or exclusion from a set) or real-valued. PIGEAN uses these annotations to model the prior probability $\hat{\pi}_i = \text{Pr}(d_i=1)$ in Equation ~\ref{eq:direct_BF} and to yield the indirect approximate Bayes Factor, denoted $ABF_i^I$, capturing the relevance of $g_i$ to a trait based on its associated annotations. Specifically:
+
+% \begin{equation} \label{eq:indirect_prior}
+%     \log \frac{\hat{\pi}_i}{1-\hat{\pi}_i} = \sum_j X_{ij}\mathbb{E}[\beta_j \mid \mathbf{d}] + \alpha_i + \log\frac{\pi}{1-\pi}
+% \end{equation}
+% such that $\beta_j$ represents the effect size of the $j$-th annotation and whose prior probability, $P(\beta_j)$, is given by the following spike and slab [] distribution:
+% \begin{align*}
+%     \beta_j \sim \delta_j\mathbf{N}(0, \sigma_j^2) \quad
+%     \alpha_i = \alpha\sum_j X_{ij} \quad
+%     \sigma_j^2 = \sigma^2\text{Var}_i(|X_{ij}|)^w \quad
+%     \delta_j \sim \text{Bern}(p) \quad
+% \end{align*}
+
+% where $\pi$ is the background prior probability, set following the same assumptions in the direct support case: $\pi=0.05$ for complex traits and $\pi = 0.01$ for rare diseases. However, unlike the direct support case alone, the informed prior $\hat{\pi}$ can be dynamically updated based on genetic evidence from other genes that share functional annotations, by propogating through the expected annotation effect sizes, $\mathbb{E}[\beta_j \mid \mathbf{d}]$. The parameters $\alpha$, $\sigma$, $\omega$, and $p$ enforce various modes of regularization (see Methods). Specifically, $\delta_j \sim \text{Bern}(p)$ enforces gene set sparsity and $\sigma_j^2 = \sigma^2\text{Var}_i(|X_{ij}|)^\omega$ penalizes larger gene sets. 
+
+% It is critical to note the coupling between the two latent variables $\beta_j$ and $d_i$. In Equation~\ref{eq:indirect_prior}, we need an expectation for $\beta_j$ to calculate $\hat{\pi}$ and thereby $P(d_i \mid S, \hat{\pi})$ in Equation~\ref{eq:direct_BF}, but in order to sample from $P(\beta_j \mid \mathbf{d})$, we require an estimate for each gene's relavence, $d_i$. To circumvent this circularity, we employ an iterative Gibb's sampling approach.
+
+% \paragraph{Jointly Inferring Direct and Indirect Support}
+% To jointly infer direct and indirect support, we need to sample from the joint distribution $P(\mathbf{d}, \mathbf{\hat{\pi}} \mid \mathcal{S})$. Such a sampling is possible if we can sample from the $P(\mathbf{d} \mid \beta, \mathcal{S})$ and $P(\beta \mid \mathbf{d}, \mathcal{S}) = P(\beta \mid \mathbf{d})$ since $\beta$ is the only random variable in Equation~\ref{eq:indirect_prior} and all information of $\mathcal{S}$ is encoded in $\mathbf{d}$. Therefore, given a estimate for every gene's relevance, $\mathbf{d}$, we can estimate $P(\beta_j \mid \mathbf{d})$ by logistically regressing each annotation $X_{\cdot j}$ vector on this estimate of $\mathbf{d}$ with our prior distribution, $P(\beta)$ previously specified. Using this new estimate $\tilde{\beta_j}$ of the effect size, we can use Equation~\ref{eq:direct_BF} and~\ref{eq:indirect_prior} to infer an update for overall gene relevance, $\mathbf{\tilde{d}}$. With these update equations specified for $P(\beta \mid \mathbf{d})$ and $P(\mathbf{d} \mid \beta, \mathcal{S})$, we can employ Gibbs sampling to run these updates until convergence yielding the true joint distribution. The full PIGEAN model as a directed graph is depicted in Figure~\ref{fig:pigean-model}
+
+\subsection{Validation on Simulations}
+As a negative control, we first applied PIGEAN to the 20 “null” simulated GWAS and found that, as expected, inferred gene annotation effect sizes were all close to zero (Extended Data Figure~\ref{fig:null_sim}a) as were indirect, direct, and combined gene ABFs (Supplementary Figure \ref{fig:null_sim}bcd). Similarly, when we applied PIGEAN to the 50 real GWAS but randomly permuted genes within the 166,868 gene annotations, we also observed annotation effect sizes close to zero (Supplementary  Figure \ref{fig:null_sim}e). Across our 20 null simulations and 166,868 annotations only one gene had combined gene ABF above 3 (Supplementary Figure \ref{fig:null_sim}g), with the dominant contribution coming from direct ABFs (Supplementary Figure \ref{fig:null_sim}h), and across the 50 real GWAS with permuted annotations, only one annotation had effect size above 0.004 (Supplementary Figure \ref{fig:null_sim}f). Based on these results, annotation effect sizes of 0.005 and gene combined ABFs of 3 roughly correspond to “study-wide significant” p-value thresholds (Supplementary Table 3).
+
+We also used simulations with non-zero annotation effect sizes to understand the behavior of PIGEAN in response to different model parameters. Accuracy of PIGEAN is affected by noise from two sources: the incomplete ability of annotations to predict disease-relevant genes (“annotation noise”), and the incomplete ability of summary statistics to identify disease-relevant genes (“association noise”). Focusing first on annotation noise, we ran PIGEAN with a truncated model in which we treated each gene’s probability of disease relevance ($d_i$) as observed rather than inferred from summary statistics. These simulations yielded four main findings. First, PIGEAN in general conservatively estimates both annotation effect sizes (Supplementary Figure \ref{fig:non_null_sim}a) and gene ABFs (Supplementary Figure \ref{fig:non_null_sim}b), due to its “spike and slab” regularization that sets estimated effect sizes to zero and shrinks estimated effect sizes toward zero. Second, annotations with negative effects (i.e. that reduce genetic support) were shrunk substantially more than those with positive effects, as (consequently) were genes with ABFs < 1, an asymmetry that naturally results from the higher standard errors for negative gene set effect sizes when there are only a small number of disease-relevant genes (Supplementary Figure \ref{fig:non_null_sim}cd). Third, PIGEAN’s accuracy was also affected by simulation parameters, with more accurate inferences possible for larger simulated effect size magnitudes (larger $\sigma$ Supplementary Figure \ref{fig:sim_params}a) and (to a lesser extent) more non-zero simulated effect sizes (larger $p$; Supplementary Figure \ref{fig:sim_params}b). Additional noise added to the simulated gene ABFs affected accuracy of the inferred ABFs but (perhaps non-intuitively) did not affect accuracy of the inferred annotation effect sizes (Supplementary Figure \ref{fig:sim_params}c). Finally, due to the nature of Gibbs sampling, estimates produced by PIGEAN varied across runs, but with sufficient numbers of iterations and chains estimates were stable (Supplementary Figure \ref{fig:sim_stability}).
+
+These simulations confirmed the importance PIGEAN’s joint inference and regularization features. First, its full joint inference procedure (in which gene and gene set values are iteratively re-estimated) increased accuracy compared to a model in which gene set effect sizes were only estimated once (Supplementary Figure \ref{fig:sim_onestep}). Second, even though simulated gene ABFs had no dependence on the number of annotations for the gene, regularization (via its  parameter) to penalize genes with many annotations was necessary to avoid biases and ABF accuracy reductions induced (as described in Supplementary Figure \ref{fig:non_null_sim}cd) by asymmetric annotation standard errors (Supplementary Figure \ref{fig:sim_induced}). Similarly, even though simulated annotation effect sizes had no dependence on the number of genes with the annotation, regularization (via its w parameter) to penalize “large” annotations was necessary to avoid biases induced by the smaller standard errors of larger annotations (Supplementary Figure \ref{fig:sim_reg}; Methods).
+
+For simulations with a small number of non-zero annotation effects, PIGEAN was able to infer reasonably accurate estimates of its sparsity parameter ($p$) (Supplementary Figure \ref{fig:sim_param_infer}), although it significantly underestimated $p$ as the fraction of non-zero effects increased. Our attempts to estimate PIGEAN’s shrinkage parameter ($\sigma$) for individual simulations suggested that there are typically too few annotations  to estimate this parameter accurately, and we therefore tuned this parameter empirically (Methods). Fortunately, varying these parameters from their simulated values by even an order of magnitude did not dramatically reduce PIGEAN’s estimation accuracy (Supplementary Figures \ref{fig:sim_vary_sigma} and \ref{fig:sim_vary_p}).
+
+In addition to these simulations focused exclusively on “annotation noise”, we also evaluated the impact of  “association noise” on PIGEAN’s performance – that is, the reality that (due to finite sample sizes and the vagaries of evolution) many disease-relevant genes will not lie near detectable association signals. We studied association noise in the context of GWAS summary statistics, given the well-documented difficulties in inferring effector genes from these data. For each of three annotation noise settings (Methods), we simulated five GWAS of increasing sample sizes (using linkage disequilibrium from the 1000 Genomes Project, SNP to gene linkages from a previously published method, and SNP effect size parameters from previously published simulations; Methods). As expected, the use of GWAS data rather than observed disease probabilities degraded the accuracy of PIGEAN (Supplementary Figure \ref{fig:sim_gwas_gene_set}a). With perfect knowledge of SNP to gene linkages Supplementary Figure \ref{fig:sim_gwas_gene_set}b), less annotation noise Supplementary Figure \ref{fig:sim_gwas_gene_set}c), or larger sample sizes Supplementary Figure \ref{fig:sim_gwas_gene_set}d), the accuracy of PIGEAN increased, but only to limited extent. Accuracy was much higher for marginal annotation effect sizes than for joint effect sizes Supplementary Figure \ref{fig:sim_gwas_gene_set}e), which is a common feature of multivariate models with correlated predictors. When PIGEAN inferred its regularization parameters, rather than being given the true parameters used in simulations, accuracy degraded further Supplementary Figure \ref{fig:sim_gwas_gene_set}f). Notably, however, in all scenarios PIGEAN conservatively estimated annotation effect sizes, suggesting that the overwhelming impact of GWAS annotation noise is to decrease power rather than to increase false positives.
+
+We conclude that, under idealized simulations, PIGEAN behaves broadly as expected. Three noteworthy properties are (a) the difficulty of inferring negative genetic support (due to known properties of GWAS but perhaps unappreciated properties of models with few disease-relevant genes); (b) the importance of regularization and iterative inference in gene set analysis, and (c) it conservative nature when confronted with annotation noise and and association noise.
+
+\subsection{Validation on Real Data}
+\paragraph{Selection of Validation Phenotypes}
+%TODO: Also include bottom line and/or credible set information for each phenotype to prove we looked at phenos with varying GWAS significance levels
+For common traits, we selected 13 phenotypes (Table~\ref{tab:common-validation-traits}) encompassing both continuous and dichotomous traits with GWAS data of varying significance but which we had curated gold-standard genesets for validation. This diversity allows us to evaluate PIGEAN and respective PIGEAN models under a broad range of real-world conditions. For rare traits, we chose 40 phenotypes (Table~\ref{tab:rare-validation-traits}) that span multiple organ systems, inheritance patterns, and pathophysiological mechanisms. This set includes both specific rare diseases (with more than 10 associated genes) and groups of disorders representing higher-level disease clusters. To ensure a balanced representation without excessive overlap in gene lists, we verified that the maximum Jaccard similarity among groups of disorders is 0.14 and 0.11 among specific diseases, with average similarities of 0.00653 and 0.0016, respectively. By covering a wide range of disease etiologies and genetic architectures, we can thoroughly assess our method's performance across diverse traits.
+
+\input{tables/validation_trait_information}
+
+\subsection{Gene Set Library Curation}
+% Section about MeSH Text Mining models
+For text mining models, we curated text mining based gene sets from three libraries: Gene-Mesh Co-Occurance via Pubmed publications, String DB, and RummaGene. For the Gene-MeSH co-occurance gene sets, we downloaded Gene to PubMed article mappings from the PubTator3 \cite{wei_pubtator_2024} FTP server\footnote{The gene2pubtator3.gz file is available at the following \href{https://ftp.ncbi.nlm.nih.gov/pub/lu/PubTator3/}{link} and was downloaded on May 13, 2025 for all results presented.} which includes results are from AIONER \cite{luo_aioner_2023} for Named Entity Recognition and GNorm2 \cite{wei_gnorm2_2023} for normalization. In order to contruct the MeSH term to Pubmed co-occurances, we downloaded the full Pubmed Baseline containing all pubmed information for 2025\footnote{The Pubmed baseline XML files are available at the following \href{https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/}{link} and the January 10, 2025 release was used for all results presented.}. From these set of co-occurances, we then created a master gene set library that would have included publications that were based on genetics including GWAS. Therefore, we curated a list of MeSH terms related to GWAS as seen in Table~\ref{tab:gwas-mesh-terms}. We then formed three MeSH-based gene set libraries: (1) a library in which all pubmed publications are considered, (2) a library in which all GWAS and genetics-based papers are excluded (no circularity), and (3) a library that contains only GWAS and genetics-based papers (fully circular). We then used these three libraries to study the effect of circularity explicitly. Further, we waited each gene in their associated geneset by a normalized jaccard index and which each MeSH term has an associated gene set. MeSH terms that had more than 2000 genes associated with them were excluded.
+
+\input{tables/gwas_mesh_terms}
+
+\subsection{Relative Success as a Metric}
+Discuss relative success methods
+
+\subsection{Common Disease GWAS}
+Discuss GWAS Catalog curation and portal curation. Discuss mapping to MESH.
+
+\subsection{Rare Disease Curation}
+Discuss running PIGEAN on gene lists. Discuss mapping to MeSH.
+
+\section{Extended Data} \label{sec:extended-data}
+% % Deplicate this as a placeholder for figures
+% \begin{figure}[h!]
+%     \centering
+%     \begin{tikzpicture}
+%         % Draw a light gray rectangle as the placeholder
+%         \fill[gray!20] (0, 0) rectangle (\textwidth, 4); 
+%         % Add text in the center of the rectangle
+%         \node[align=center] at (\textwidth/2, 2) {\Large Placeholder Figure};
+%     \end{tikzpicture}
+%     \caption{Caption describing the placeholder.}
+%     \label{fig:placeholder}
+% \end{figure}
+
+
+% Start of real figures
+\begin{figure}[t!]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/indirect-support/real/all.pops_vs_pigean_comparision.summary_over_phenotype.precision.png}
+        \caption{}
+        \label{fig:pops-v-pigean-precision-all}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/indirect-support/real/all.pops_vs_pigean_comparision.summary_over_phenotype.recall.png}
+        \caption{}
+        \label{fig:pops-v-pigean-recall-all}
+    \end{subfigure}
+    \caption{PoPS vs. Pigean over large set of various annotation source (Methods) comparison using gold-standard gene sets informed by an LLM analysis using precision and recall @ $K$ over 13 complex traits.}
+    \label{fig:pops-vs-pigean-goldstandard-all}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/indirect-support/real/depict.pops_vs_pigean_comparision.summary_over_phenotype.precision.png}
+        \caption{}
+        \label{fig:pops-v-pigean-precision-depict}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/indirect-support/real/depict.pops_vs_pigean_comparision.summary_over_phenotype.recall.png}
+        \caption{}
+        \label{fig:pops-v-pigean-recall-depict}
+    \end{subfigure}
+    \caption{PoPS vs. Pigean over depict annotations comparison using gold-standard gene sets informed by an LLM analysis using precision and recall @ $K$ over 13 complex traits.}
+    \label{fig:pops-vs-pigean-goldstandard-depict}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{figures/indirect-support/real/2__full_oa4ol__rare.gene_set_hist.pdf}
+    \caption{Caption}
+    \label{fig:rare-full-model-genesets}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/v1_all-areas.pigean_rs_curves.png}
+    \caption{Relative success of PIGEAN supported target-indication pairs overall clinical areas for common (from curated GWAS and GWAS catalog traits) and rare diseases curated from Orphanet.}
+    \label{fig:rs-curves}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/v1_all-areas_relative_success_heatmap.png}
+    \caption{Heatmap of the relative success of PIGEAN supported target-indications as a function of both direct and indirect support overall clinical areas. }
+    \label{fig:rs-heatmap}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/v1_all-areas_relative_success_vs_indirect.png}
+    \caption{Relative success as a function of just indirect support (Direct support $<=$ 5.)}
+    \label{fig:rs-indirect}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig1.png}
+    \caption{}
+    \label{fig:null_sim}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig2.png}
+    \caption{}
+    \label{fig:non_null_sim}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig3.png}
+    \caption{}
+    \label{fig:sim_params}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig4.png}
+    \caption{}
+    \label{fig:sim_stability}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig5.png}
+    \caption{}
+    \label{fig:sim_onestep}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig6.png}
+    \caption{}
+    \label{fig:sim_reg}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig7.png}
+    \caption{}
+    \label{fig:sim_induced}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig8.png}
+    \caption{}
+    \label{fig:sim_param_infer}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig9.png}
+    \caption{}
+    \label{fig:sim_vary_sigma}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig10.png}
+    \caption{}
+    \label{fig:sim_vary_p}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/indirect-support/real/suppfig11.png}
+    \caption{}
+    \label{fig:sim_gwas_gene_set}
+\end{figure}

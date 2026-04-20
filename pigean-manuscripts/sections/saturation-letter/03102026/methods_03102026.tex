@@ -1,0 +1,21 @@
+\section{Methods}\label{sec:letter-methods}
+
+% PIGEAN reference
+\subsection{PIGEAN framework}
+Direct and indirect genetic support were computed using PIGEAN \cite{}, a Bayesian framework described in detail in the companion paper. Briefly, PIGEAN estimates direct genetic support from GWAS summary statistics via probabilistic variant-to-gene assignment (HuGER scores) and indirect genetic support via a spike-and-slab model in which functional annotations modulate gene-trait relevance priors. Both are expressed as Bayes factors on a common scale. We used the Mouse+MSigDB model ({{NUM_MPO_TERMS:,}} Mammalian Phenotype Ontology terms and {{NUM_MSIGDB_GENESETS:,}} MSigDB gene sets), which was identified as the top-performing general-purpose model in the companion paper.
+
+% Expected discovery
+\subsection{Expected discovery metric}
+For each gene $i$ and evidence type, the expected discovery is $D_i = P_i^{\text{post}} - P_i^{\text{prior}}$, where $P_i^{\text{post}} = \pi \cdot \text{ABF}_i / (1 + \pi \cdot \text{ABF}_i)$ and $\pi = 0.05$. The total expected discovery $\tilde{N} = \sum_i D_i$ is computed separately for direct ($\tilde{N}_D$), indirect ($\tilde{N}_I$), and combined ($\tilde{N}_C$) support.
+
+% Downsampling
+\subsection{Downsampling procedure}
+For each of {{NUM_TRAITS_SATURATION_ANALYSIS}} traits with full GWAS summary statistics, we simulated reduced sample sizes by inflating each SNP's standard error: $\text{SE}_f = \text{SE}_{\text{orig}} / \sqrt{f}$, where $f \in \{0.1, 0.2, \ldots, 1.0\}$. At each fraction, we ran the full PIGEAN pipeline to compute direct, indirect, and combined expected discovery. Independent locus counts were obtained by LD-clumping at each downsampled significance level.
+
+% Classification
+\subsection{Saturation classification}
+For each trait, we fit the direct support trajectory $\tilde{N}_D(f)$ with (i) a linear model $\tilde{N}_D = af + b$ and (ii) an exponential saturation model $\tilde{N}_D = a(1 - e^{-bf})$. Models were compared using the Bayesian Information Criterion (BIC). Traits were classified as saturated if $\Delta\text{BIC} > 6$ favoring the saturation model and the current expected discovery exceeded 80\% of the fitted asymptote. Among non-saturated traits, annotation-limited traits were identified as those where indirect support accumulated more slowly than direct support (ratio $\tilde{N}_I / \tilde{N}_D < 0.5$ at full sample size); the remainder were classified as power-limited.
+
+% TODO: Verify these classification thresholds against actual data when saturation
+% analysis is complete. The BIC > 6 and 80% asymptote thresholds are placeholders
+% based on standard model comparison practice.

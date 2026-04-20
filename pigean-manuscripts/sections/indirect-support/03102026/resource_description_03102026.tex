@@ -1,0 +1,50 @@
+\subsection{A Phenome-Wide Map of Gene-Trait Relevance}
+
+% STRUCTURE: This section summarizes the full phenome-wide application as a resource.
+% It answers: what does the field get from PIGEAN that it didn't have before?
+
+Applying the Mouse+MSigDB model across {{NUM_TOTAL_TRAITS_MOUSE_MSIGDB:,}} traits ({{NUM_COMMON_TRAITS_MOUSE_MSIGDB:,}} common, {{NUM_RARE_TRAITS_MOUSE_MSIGDB:,}} rare) and {{NUM_TOTAL_GENE_ANNOTATIONS:,}} gene annotations, PIGEAN produces a dense probabilistic map of gene-trait relevance. At a posterior probability threshold of 90\%, we identify {{NUM_GENETRAIT_REL_PP90:,}} gene-trait relationships, an average of {{NUM_PER_TRAIT_PP90}} genes per trait and {{NUM_PER_GENE_PP90}} traits per gene. At a more inclusive threshold of 50\%, this expands to {{NUM_GENETRAIT_REL_PP50:,}} relationships ({{NUM_PER_TRAIT_PP50}} per trait, {{NUM_PER_GENE_PP50}} per gene).
+
+% TODO: Add comparison to existing resources - how many gene-trait relationships
+% does Open Targets Genetics have? GWAS Catalog? Orphanet? This would quantify
+% the "orders of magnitude denser" claim from the abstract.
+
+Each gene-trait relationship is accompanied by provenance identifying the specific SNP associations or gene records contributing to direct support and the specific genesets contributing to indirect support. Across all traits, PIGEAN evaluates {{NUM_GENESET_TRAIT_ASSOC_MILLIONS}} million geneset-trait associations, retaining only those that survive the spike-and-slab regularization as non-zero contributors to indirect support.
+
+% TODO: Add a brief description of what users can do with this resource.
+% - Query a gene: which traits is it relevant to, and through which annotations?
+% - Query a trait: which genes are relevant, and which are novel (indirect-only)?
+% - Query a geneset: for which traits does it carry non-zero effect?
+% - Bring your own annotations: run PIGEAN with a new CRISPR screen or single-cell atlas
+
+% FIGURE SUGGESTION: A summary figure showing (a) density of gene-trait map vs. existing
+% resources, (b) distribution of direct vs indirect contributions across gene-trait pairs,
+% (c) example queries for a well-known gene (e.g., PCSK9) and a well-known trait (e.g., T2D).
+
+% ANALYSIS IDEA: Show that the resource captures gene-trait relationships not in any
+% existing curated database. How many PP>90% relationships have no corresponding
+% entry in Open Targets or GWAS Catalog?
+
+% STRUCTURE: This anecdote illustrates how querying PIGEAN geneset enrichments for a
+% known gene-trait pair can generate mechanistic hypotheses that connect siloed literatures.
+% Additional anecdotes to follow.
+
+As an illustration of how the resource can generate mechanistic hypotheses, we examined the PIGEAN geneset enrichments for \textit{HLA-DRB1} in multiple sclerosis (MS). A collaborator had observed that male MS patients carrying \textit{HLA-DRB1} risk variants exhibited worse inflammation biomarkers (serum GFAP and NfL) and worse clinical outcomes than female carriers of the same variants---a pattern consistent with the well-documented MS sex paradox in which women develop MS approximately three times more often but men progress faster once diagnosed \cite{voskuhl_sex_2020}. Querying the PIGEAN resource for the top geneset enrichments of \textit{HLA-DRB1} in MS across two model configurations (a smaller MSigDB-only model and a larger Mouse+MSigDB model) revealed convergent biology: cell adhesion molecules (KEGG CAMs, enrichment score 0.848 in the small model), lymphotoxin-alpha (LTA, 0.562), common variable immunodeficiency (0.571), CD40 signaling (0.150), TNF receptor superfamily member~7/CD27 (0.204), and multiple gene ontology terms related to leukocyte adhesion and T~cell activation.
+
+% TODO: MS_HLA_DRB1_NUM_GENESETS_SMALL - Number of non-zero genesets in the small model run
+% TODO: MS_HLA_DRB1_NUM_GENESETS_LARGE - Number of non-zero genesets in the large model run
+% TODO: Add formal references for each key paper cited in this section to references.bib
+
+These enrichments decompose the \textit{HLA-DRB1} effect into a three-stage mechanistic cascade supported by independent experimental evidence: (1)~enhanced MHC-II-mediated antigen presentation driving T~cell priming, consistent with reports that \textit{HLA-DRB1*15:01} carriers show constitutively elevated HLA-DR expression on cortical microglia and larger grey matter lesions \cite{enz_increased_2020, yates_association_2015}; (2)~TNF superfamily amplification via LTA, CD40, and CD27 signaling that promotes B~cell activation and meningeal tertiary lymphoid tissue (TLT) formation, as demonstrated experimentally by Bates et al.\ (2022) and Naouar et al.\ (2026) \cite{bates_lymphotoxin_2022, naouar_lymphotoxin_2026}; and (3)~cell adhesion molecule-mediated lymphocyte transmigration across the blood-brain barrier, the rate-limiting step for CNS immune infiltration and the therapeutic target of natalizumab. Critically, each stage of this cascade interacts with sex-specific biology: estrogen partially suppresses TNF/LTA production by activated lymphocytes, providing upstream braking in women that is absent in men; blood-brain barrier endothelial responses to inflammation are sexually dimorphic \cite{weber_cerebrovascular_2021}; and downstream neuroprotection through estrogen receptor signaling on astrocytes and oligodendrocytes buffers women against the cortical damage driven by meningeal TLTs \cite{spence_neuroprotection_2011}. Men carrying \textit{HLA-DRB1} risk variants thus face a ``double hit'': the immune cascade runs with less hormonal restraint while the CNS neuroprotective buffer is weaker, consistent with the recent finding that \textit{HLA-DRB1*15:01} is associated with reduced longevity specifically in males \cite{mendoza_mejia_hla_2025}. While individual components of this model have been characterized in separate literatures---sex differences in MS progression, HLA-DRB1 effects on cortical pathology, and LTA-driven TLT formation---the integrated chain linking genotype to sex-differential severity through these specific intermediate mechanisms had not been previously proposed. The PIGEAN geneset enrichments independently recovered these nodes from GWAS data alone, illustrating how the resource can bridge siloed experimental literatures to generate testable mechanistic hypotheses.
+
+% MISSING EVIDENCE: The sex-stratified analysis of HLA-DRB1 effects on GFAP/NfL
+% would be strengthened by including the specific effect sizes from the collaborator's
+% analysis once available. Consider adding variables:
+% TODO: MS_HLA_DRB1_MALE_GFAP_BETA - Effect of DRB1 on GFAP in males
+% TODO: MS_HLA_DRB1_FEMALE_GFAP_BETA - Effect of DRB1 on GFAP in females
+% TODO: MS_HLA_DRB1_SEX_INTERACTION_P - P-value for sex interaction term
+
+% ANALYSIS IDEA: Run PIGEAN on MS GWAS stratified by sex (if sex-stratified
+% summary statistics are available) to test whether the geneset enrichment profile
+% itself differs between male and female MS. This would directly test whether
+% the model captures sex-differential biology at the geneset level.

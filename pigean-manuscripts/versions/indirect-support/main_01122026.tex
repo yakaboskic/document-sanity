@@ -1,0 +1,231 @@
+
+% PIGEAN VERSION 11182025
+% Template Version: Version 3 October 2023
+% See section 11 of the User Manual for version history
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%                                                                 %%
+%% Please do not use \input{...} to include other tex files.       %%
+%% Submit your LaTeX manuscript as one .tex document.              %%
+%%                                                                 %%
+%% All additional figures and files should be attached             %%
+%% separately and not embedded in the \TeX\ document itself.       %%
+%%                                                                 %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%\documentclass[referee,sn-basic]{sn-jnl}% referee option is meant for double line spacing
+
+%%=======================================================%%
+%% to print line numbers in the margin use lineno option %%
+%%=======================================================%%
+
+%%\documentclass[lineno,sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
+
+%%======================================================%%
+%% to compile with pdflatex/xelatex use pdflatex option %%
+%%======================================================%%
+
+%%\documentclass[pdflatex,sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
+
+
+%%Note: the following reference styles support Namedate and Numbered referencing. By default the style follows the most common style. To switch between the options you can add or remove Numbered in the optional parenthesis. 
+%%The option is available for: sn-basic.bst, sn-vancouver.bst, sn-chicago.bst%  
+ 
+\documentclass[sn-nature,lineno]{sn-jnl}% Style for submissions to Nature Portfolio journals
+%%\documentclass[sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
+%%\documentclass[sn-mathphys-num]{sn-jnl}% Math and Physical Sciences Numbered Reference Style 
+%%\documentclass[sn-mathphys-ay]{sn-jnl}% Math and Physical Sciences Author Year Reference Style
+%%\documentclass[sn-aps]{sn-jnl}% American Physical Society (APS) Reference Style
+%%\documentclass[sn-vancouver,Numbered]{sn-jnl}% Vancouver Reference Style
+%%\documentclass[sn-apa]{sn-jnl}% APA Reference Style 
+%%\documentclass[sn-chicago]{sn-jnl}% Chicago-based Humanities Reference Style
+
+%%%% Standard Packages
+%%<additional latex packages if required can be included here>
+
+% Changing geoemtry to look better (imo)
+\geometry{a4paper, margin=1in}
+
+% Change font to arial 
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+
+\usepackage{graphicx}%
+\usepackage{multirow}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{amsthm}%
+\usepackage{mathrsfs}%
+\usepackage[title]{appendix}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
+\usepackage{algorithm}%
+\usepackage{algorithmicx}%
+\usepackage{algpseudocode}%
+\usepackage{listings}%
+\usepackage{subcaption}
+\usepackage{comment}
+\usepackage{tikz}
+\usepackage{luacode}
+\usepackage{pdfpages}
+\usepackage{hyperref}
+%%%%
+
+%%%%%=============================================================================%%%%
+%%%%  Remarks: This template is provided to aid authors with the preparation
+%%%%  of original research articles intended for submission to journals published 
+%%%%  by Springer Nature. The guidance has been prepared in partnership with 
+%%%%  production teams to conform to Springer Nature technical requirements. 
+%%%%  Editorial and presentation requirements differ among journal portfolios and 
+%%%%  research disciplines. You may find sections in this template are irrelevant 
+%%%%  to your work and are empowered to omit any such section if allowed by the 
+%%%%  journal you intend to submit to. The submission guidelines and policies 
+%%%%  of the journal take precedence. A detailed User Manual is available in the 
+%%%%  template package for technical guidance.
+%%%%%=============================================================================%%%%
+
+%% as per the requirement new theorem styles can be included as shown below
+\theoremstyle{thmstyleone}%
+\newtheorem{theorem}{Theorem}%  meant for continuous numbers
+%%\newtheorem{theorem}{Theorem}[section]% meant for sectionwise numbers
+%% optional argument [theorem] produces theorem numbering sequence instead of independent numbers for Proposition
+\newtheorem{proposition}[theorem]{Proposition}% 
+%%\newtheorem{proposition}{Proposition}% to get separate numbers for theorem and proposition etc.
+
+\theoremstyle{thmstyletwo}%
+\newtheorem{example}{Example}%
+\newtheorem{remark}{Remark}%
+
+\theoremstyle{thmstylethree}%
+\newtheorem{definition}{Definition}%
+
+%% New commands
+% Probablity Dist function
+\newcommand{\prob}{\text{Pr}}
+% Variable lookup function
+\newcommand{\getvar}[1]{\directlua{lookup("#1")}}
+
+\raggedbottom
+%%\unnumbered% uncomment this for unnumbered level heads
+
+\begin{document}
+
+\title[Article Title]{Beyond the Locus: Modeling Indirect Genetic Support to Expand the Reach of Human Genetics}
+
+%Dual embeddings of 6,915 traits and 18,125 genes learned from direct and indirect human genetic support
+%A dense statistical map of direct and indirect genetic support between 18,125 genes and 6,915 rare and common human traits
+
+
+%%=============================================================%%
+%% GivenName	-> \fnm{Joergen W.}
+%% Particle	-> \spfx{van der} -> surname prefix
+%% FamilyName	-> \sur{Ploeg}
+%% Suffix	-> \sfx{IV}
+%% \author*[1,2]{\fnm{Joergen W.} \spfx{van der} \sur{Ploeg} 
+%%  \sfx{IV}}\email{iauthor@gmail.com}
+%%=============================================================%%
+
+\author*[1,2]{\fnm{First} \sur{Author}}\email{iauthor@gmail.com}
+
+\author[2,3]{\fnm{Second} \sur{Author}}\email{iiauthor@gmail.com}
+\equalcont{These authors contributed equally to this work.}
+
+\author[1,2]{\fnm{Third} \sur{Author}}\email{iiiauthor@gmail.com}
+\equalcont{These authors contributed equally to this work.}
+
+\affil*[1]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{100190}, \state{State}, \country{Country}}}
+
+\affil[2]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{10587}, \state{State}, \country{Country}}}
+
+\affil[3]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{610101}, \state{State}, \country{Country}}}
+
+%%==================================%%
+%% Sample for unstructured abstract %%
+%%==================================%%
+
+\abstract{
+Human genetic evidence is known to increase the likelihood of clinical success in drug development \cite{ochoa_human_2022,rusina_genetic_2023}. Yet fewer than 5\% of active drug programs are supported by germline genetic data \cite{minikel_refining_2024}, revealing a critical gap in how genetic knowledge is incorporated into therapeutic pipelines. To help bridge this gap, we introduce the concept of indirect genetic support, which captures evidence derived from associations with biologically related genes linked through shared annotations. This expands on direct genetic support by probabilistically integrating both genetic and non-genetic information into a unified model aimed at improving mechanistic understanding and clinical outcomes. We present PIGEAN, a Bayesian framework that quantifies direct and indirect support using GWAS summary statistics, exome-wide gene-level associations, and rare disease gene sets. Applied across 6,000 complex traits, 2,000 rare diseases, 600,000 gene annotations, and 29,000 drug programs, PIGEAN constructs a weighted graph that serves as a genetically grounded backbone for biomedical discovery. Our analysis shows that drug targets prioritized via this graph achieve clinical success rates comparable to those found in curated drug target databases, while also revealing over 1,500 additional viable targets through indirect evidence alone. By organizing gene prioritization along the interpretable axes of direct and indirect support, PIGEAN offers a principled alternative to existing ad hoc methods. When paired with AI agents, this framework enables scalable, mechanistically informed exploration of the gene–phenotype landscape, probablistically connecting every gene to every trait using the structure of current biological knowledge.
+}
+
+%NOTES FOR ABSTRACT
+%Novel inferences of course
+%But beyond that, the presence of known and novel all in one place enables analyses (RS, gene function queries, gene lists for disease, gene lists for collection of phenotypes ) that could not be done previously
+%In particular, shows shared basis of rare and common diseases, which increases further when considered at pathway level and not just genes
+
+
+%%% Old abstract
+% \abstract{Human genetic support increases the likelihood of therapeutic success and helps prioritize genes for further biological study. Here, we introduce the idea of indirect genetic support, which we distinguish from the traditional concept of direct support in that genetic associations for other genes support a target gene through shared gene annotations. We derive a mathemtical model, PIGEAN, that probabilistically estimates indirect genetic support from GWAS summary statisics, exome gene-level association statistics, and/or rare disease gene lists; we show that this model generalizes the idea of "bottom-up" or "convergence" based methods for gene prioritization and enables its combination with estimates of direct genetic support. We apply this model across \getvar{NUM_COMPLEX_TRAITS} complex traits, XXX rare diseases, and XXX gene annotations, assigning X\% of genes support for at least one trait. [Result from analysis of gene annotations]. [Result from analysis of how many GWAS loci have known mechanisms]. [Result from joint vs. marginal estimates and mechanisms]. [Result from drug target analysis]. These estimates of indirect support significantly expand the number of genes with links to human traits and enable probabilistic reasoning to replace ad hoc gene prioritization approaches that combine genetic associations with prior knowledge about gene function.
+% }
+
+%%================================%%
+%% Sample for structured abstract %%
+%%================================%%
+
+% \abstract{\textbf{Purpose:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.
+% 
+% \textbf{Methods:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.
+% 
+% \textbf{Results:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.
+% 
+% \textbf{Conclusion:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.}
+
+\keywords{keyword1, Keyword2, Keyword3, Keyword4}
+
+%%\pacs[JEL Classification]{D8, H51}
+
+%%\pacs[MSC Classification]{35A01, 65L10, 65L12, 65L20, 65L70}
+
+\maketitle
+
+\newpage
+\tableofcontents
+\newpage
+
+\input{sections/indirect-support/01122026/introduction_01122026}
+
+\section{Results}
+
+% Results story
+% 1. Show the embedding map of traits and how it overlays with ontological structures
+% 2. Overview of the method
+% 3. Show that indirect support is predictive of direct genetic support and controled for circularity
+% 3. Show that indirect support is predictive of clinical success
+% 4 (or 3.1). Show that both are really predictive of clinical success
+% 5. Show which geneset libraries are good and bad for for which trait groups
+% 6. Show how textmining model can be used to search literature in a genetics first way
+% 7. Show how the embedding map can be used in agentic tooling for hypothesis generation and validation
+
+
+\input{sections/indirect-support/01122026/methods_overview_01122026}
+
+\input{sections/indirect-support/01122026/validation_genetics_01122026}
+
+\input{sections/indirect-support/01122026/validation_pharma_01122026}
+
+\input{sections/indirect-support/01122026/validation_clinical_01122026}
+
+\bibliography{references}% common bib file
+
+% Commenting out for now because weird imports (need to fix)
+% % Supplementary information
+% \input{sections/indirect-support/01122026/supplementary_01122026}
+
+
+\end{document}
+
+% Some notes
+% - pigean indirect + direct over common
+% - pigean indirect over common (A2F and/or GWAS Cat)
+% - combined
+% - piccolo
+% - OTG - All
+% - magma 
+% - bar or point
+% - Temporal figure of indirect support regress magma2d
+% - Take temporal direct support out 2c and cite in paper
+
+
+% 3x2 for figure. Panel A is RS, Panel B is 1d
+
+% We developed pigean and applied to XXXX common traits, predicted RS, and held when holding out future whatever. 

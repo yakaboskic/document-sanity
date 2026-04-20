@@ -1,0 +1,13 @@
+{
+  "_COMMENT_DISCOVERY_CYCLE": "Variables for the discovery cycle / saturation analysis",
+  "PERCENT_TRAITS_SATURATED": null,
+  "NUM_TRAITS_SATURATION_ANALYSIS": null,
+  "NUM_TRAITS_POWER_LIMITED": null,
+  "NUM_TRAITS_ANNOTATION_LIMITED": null,
+  "NUM_TRAITS_SATURATED_PATHWAY_CONCENTRATED": null,
+  "NUM_TRAITS_SATURATED_DISTRIBUTED": null,
+
+  "_COMMENT_SHARED_WITH_PIGEAN_PAPER": "Shared annotation library counts (also in indirect-support.json)",
+  "NUM_MPO_TERMS": 11502,
+  "NUM_MSIGDB_GENESETS": 29003
+}

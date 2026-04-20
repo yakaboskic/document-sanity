@@ -1,0 +1,142 @@
+\subsection{Context-Dependent Relevance: Calibrating Annotation Sources}
+
+\begin{figure}[t!]
+    \centering
+    {{fig:model_selection}}
+    \caption{Model selection across geneset libraries. (a) Performance of PIGEAN models defined by different geneset library combinations on common disease validation traits, measured by relative success and mechanistic alignment. Marker size indicates model complexity. (b) Same analysis on rare disease validation traits. (c) Proportion of significant genesets from each library across trait-model pairs.}
+    \label{fig:model-selection}
+\end{figure}
+
+The concept of disease relevance is inherently context-dependent: a gene relevant in the context of mouse model studies may differ from one relevant to human therapeutic intervention. PIGEAN operationalizes this by allowing different geneset libraries to define different relevance contexts. A model trained on mouse knockout phenotypes captures relevance as defined by mammalian loss-of-function studies; a model incorporating all available annotations captures a broader notion of relevance anchored by the full scope of current biological knowledge; and a model selected for performance across diverse applications provides a practical balance of accuracy and interpretability.
+
+To evaluate how annotation sources contribute to indirect support, we constructed multiple PIGEAN models, each defined by a specific combination of geneset libraries, and assessed their performance on held-out validation sets (Figure~\ref{fig:model-selection}a-b). Libraries included knockout mouse phenotypes ({{NUM_MPO_TERMS:,}} Mammalian Phenotype Ontology terms), curated pathways ({{NUM_MSIGDB_GENESETS:,}} MSigDB gene sets), literature co-occurrence ({{NUM_PFOCR_SETS:,}} Pathway Figure OCR sets, {{NUM_MESH_TERMS:,}} MeSH terms), protein interactions ({{NUM_STRING_NEIGHBORS:,}} STRING neighbors), and single-cell expression patterns ({{NUM_SINGLE_CELL_CLUSTERS:,}} cell type clusters).
+
+Across model selection experiments, a parsimonious model combining mouse phenotypes and MSigDB gene sets (Mouse+MSigDB) emerged as the top performer for general-purpose applications (Figure~\ref{fig:model-selection}a-b). This model achieved high relative success for drug target prioritization while maintaining mechanistic interpretability, and we adopted it for phenome-wide analysis. The spike-and-slab prior inherent to PIGEAN regularizes away uninformative annotations, enabling robust performance even when including heterogeneous or partially redundant libraries.
+
+The contribution of each library varied systematically across trait categories (Figure~\ref{fig:model-selection}c). Mouse phenotype annotations contributed disproportionately to metabolic and developmental traits, consistent with the extensive phenotyping of these systems in model organisms. MSigDB pathway annotations showed broader utility across trait categories. Literature-derived annotations (PFOCR, MeSH) contributed more to well-studied diseases but showed signatures of ascertainment bias toward historically researched genes. These patterns highlight that the ``best'' annotation source depends on both the trait of interest and the intended application.
+
+% ANALYSIS IDEA: Show that model selection is predictive: the best model for a trait
+% category on the validation set also performs best on held-out traits in that category.
+
+To characterize what the selected Mouse+MSigDB context captures across the phenome, we summarized geneset pleiotropy by aggregating geneset evidence across $\sim$3,000 traits. The highest-ranked pleiotropic sets were biologically coherent and organized into recurrent programs rather than isolated terms (Table~\ref{tab:top-geneset-pleiotropy-beta}).
+
+% --- Ciliopathy / Developmental Module ---
+In the corrected $\beta$ results, top signals included a prominent cilia and developmental syndrome module. \texttt{WP\_CILIOPATHIES} (C2:CP:WikiPathways; 184 genes) curates genes encoding structural and regulatory components of both motile and non-motile cilia, spanning intraflagellar transport, transition zone, and basal body assembly\cite{reiter_cilia_2017}. Related sets such as \texttt{REACTOME\_CILIUM\_ASSEMBLY} (C2:CP:Reactome) and \texttt{WP\_JOUBERT\_SYNDROME} (C2:CP:WikiPathways) capture overlapping biology: Joubert syndrome arises from mutations in transition zone and basal body proteins that disrupt Hedgehog signaling and laterality determination\cite{parisi_mechanisms_2009}. This ciliary cluster dominated the rare disease (\texttt{rare\_v2}) stratification, where \texttt{WP\_BARDET\_BIEDL\_SYNDROME} (encoding the BBSome complex governing ciliary cargo trafficking\cite{nachury_bbsome_2007}), \texttt{GOCC\_CILIARY\_TRANSITION\_ZONE} (C5:GO:CC), and \texttt{WP\_GENES\_RELATED\_TO\_PRIMARY\_CILIUM\_DEVELOPMENT\_BASED\_ON\_CRISPR} (103 genes derived from CRISPR screens for ciliogenesis\cite{wheway_cilia_2015}) all ranked in the top 10. The strong and specific enrichment of ciliopathy modules in rare disease traits matches the known architecture of Mendelian multisystem ciliopathies, which cause overlapping phenotypes across retinal, renal, skeletal, and neurological systems.
+
+% --- Lipid / Lipoprotein Metabolism Module ---
+A second axis of pleiotropy was lipid and lipoprotein metabolism. \texttt{GOBP\_LIPID\_HOMEOSTASIS} (C5:GO:BP) captures the broad program of lipid sensing and regulation, while \texttt{REACTOME\_PLASMA\_LIPOPROTEIN\_ASSEMBLY\_REMODELING\_AND\_CLEARANCE} (C2:CP:Reactome; 72 genes) encompasses the full lifecycle of plasma lipoproteins, including apolipoprotein-mediated assembly (APOA1, APOB, APOE), remodeling by lipid transfer proteins (CETP, LCAT, PLTP), and receptor-mediated clearance through the LDLR pathway. \texttt{WP\_CHOLESTEROL\_METABOLISM} (C2:CP:WikiPathways) covers the mevalonate pathway and sterol regulatory element-binding protein (SREBP) signaling cascade that governs cholesterol biosynthesis and uptake. These lipid modules dominated the \texttt{gcat\_trait} stratification (Table~\ref{tab:top-geneset-pleiotropy-beta}), consistent with the large contribution of cardiometabolic and biomarker traits in common-disease GWAS. Deeper in the \texttt{gcat\_trait} rankings, \texttt{GOBP\_TRIGLYCERIDE\_METABOLIC\_PROCESS}, \texttt{GOBP\_STEROL\_METABOLIC\_PROCESS}, \texttt{GOBP\_STEROL\_TRANSPORT}, and \texttt{GOBP\_CHOLESTEROL\_EFFLUX} further specify the axis of lipoprotein biology that PIGEAN identifies as broadly relevant to common disease.
+
+% --- TF Target / Regulatory Module ---
+% QUESTION: The HJURP_TARGET_GENES, DROSHA_TARGET_GENES, and CASP3_TARGET_GENES
+% sets are from the C3:TFT:GTRD collection (506 GTRD-derived transcription factor
+% target sets based on ChIP-seq binding peaks). These are not curated pathways but
+% rather empirical binding target sets. Their high pleiotropy scores likely reflect
+% their large size and broad regulatory scope. Should we discuss this explicitly as
+% a potential confounder or as evidence that these regulatory programs are genuinely
+% pan-phenome?
+
+Several transcription factor target gene sets from the GTRD ChIP-seq compendium (C3:TFT:GTRD\cite{yevshin_gtrd_2019}) also ranked highly. \texttt{HJURP\_TARGET\_GENES} (rank 1 overall) captures genes whose promoters are bound by HJURP, a centromere-specific histone H3 variant CENP-A chaperone required for faithful chromosome segregation\cite{dunleavy_hjurp_2009}; its target set is large and pleiotropic, likely reflecting the essential role of centromere maintenance across cell types and tissues. \texttt{DROSHA\_TARGET\_GENES} (rank 4) captures binding targets of the microRNA-processing ribonuclease DROSHA, whose targets span a wide regulatory landscape of post-transcriptional gene silencing\cite{lee_drosha_2003}. In the uncorrected $\beta$ analysis (Extended Data Table~\ref{tab:supp-top-geneset-pleiotropy-beta-uncorrected-longtable}), \texttt{CASP3\_TARGET\_GENES}---genes regulated by the executioner caspase CASP3---emerged as the top overall signal, consistent with the ubiquitous role of apoptotic signaling across disease contexts. These regulatory target sets tend to be large and broadly expressed, and their high pleiotropy scores should be interpreted as reflecting pan-phenome relevance of the corresponding regulatory programs rather than pathway-specific biology.
+
+% --- Mitochondrial / Cellular Core Module ---
+The mitochondrial gene set (\texttt{MT}; C1:positional, chromosome MT) and \texttt{GOBP\_IRON\_SULFUR\_CLUSTER\_ASSEMBLY} (C5:GO:BP) represent core cellular processes with wide-ranging phenotypic consequences, from oxidative phosphorylation to electron transport chain integrity. \texttt{TFAM\_TARGET\_GENES} (C3:TFT:GTRD), capturing targets of the mitochondrial transcription factor A, ranked highly in the rare disease uncorrected analysis, reinforcing the centrality of mitochondrial function in multisystem disease.
+
+% --- Mendelian Structural / Syndromic Module ---
+Several positional and Mendelian disease gene sets also showed high pleiotropy. \texttt{WP\_TYPE\_I\_COLLAGEN\_SYNTHESIS\_IN\_THE\_CONTEXT\_OF\_OSTEOGENESIS\_IMPERFECTA} (C2:CP:WikiPathways; 33 genes) curates the biosynthesis of type I collagen---the major structural protein of bone, skin, and tendon---including the prolyl and lysyl hydroxylases, molecular chaperones, and secretory machinery whose mutations cause osteogenesis imperfecta\cite{forlino_osteogenesis_2016}. The positional set \texttt{chr7q11} (C1) corresponds to the Williams--Beuren syndrome critical region at 7q11.23, a 1.5--1.8 Mb hemizygous microdeletion encompassing $\sim$26--28 genes including elastin (\textit{ELN}) and causing the characteristic supravalvar aortic stenosis, connective tissue abnormalities, and neurodevelopmental phenotype of Williams syndrome\cite{morris_williams_2023}. Similarly, \texttt{chrYq11} captures the azoospermia factor (AZF) region on Yq11, whose microdeletions are a leading genetic cause of male infertility\cite{vogt_azf_1996}. \texttt{WP\_GENETIC\_CAUSES\_OF\_PORTO\_SINUSOIDAL\_VASCULAR\_DISEASE} (C2:CP:WikiPathways; 37 genes) maps the genetic underpinnings of portal hypertension, linking Notch signaling (RBPJ, DLL4, NOTCH1), the phagocyte NADPH oxidase complex, and ribosomal maturation (SBDS, EFL1)\cite{hernandez-gea_psvd_2020}. \texttt{WP\_INTRACELLULAR\_TRAFFICKING\_PROTEINS\_INVOLVED\_IN\_CMT\_NEUROPATHY} (C2:CP:WikiPathways; 27 genes) curates vesicle budding, Rab-mediated endosomal recycling, and mitochondrial transport proteins whose mutations cause the heterogeneous inherited peripheral neuropathy Charcot--Marie--Tooth disease\cite{bucci_cmt_2012}. That these syndrome-specific gene sets exhibit high cross-trait pleiotropy is consistent with the multisystem nature of the underlying disorders.
+
+% --- Portal-Specific Signals ---
+Portal traits showed more modest but interpretable enrichment for skeletal and cardiac developmental programs. \texttt{GOBP\_CARTILAGE\_DEVELOPMENT} and \texttt{GOBP\_CARDIAC\_CHAMBER\_MORPHOGENESIS} (C5:GO:BP) ranked in the portal top 10, alongside mouse phenotype terms for skeletal elements (\texttt{mp\_short\_tibia}, \texttt{mp\_short\_ulna}). In the uncorrected analysis, \texttt{GOBP\_CHONDROCYTE\_DIFFERENTIATION} and \texttt{GOBP\_REGULATION\_OF\_CHONDROCYTE\_DIFFERENTIATION} further populated the portal rankings, reflecting the contribution of musculoskeletal and cardiovascular traits curated in the T2D Knowledge Portal. \texttt{DESCARTES\_MAIN\_FETAL\_ERYTHROBLASTS} (C8:Cell Type Signature), derived from the Descartes single-cell atlas of human fetal gene expression\cite{cao_descartes_2020}, and \texttt{HALLMARK\_HEME\_METABOLISM} (H:Hallmark) also appeared, consistent with the portal's inclusion of hematological traits.
+
+Comparing $\beta$ and $\beta_\text{uncorrected}$ rankings further clarifies interpretation. The $\beta_\text{uncorrected}$ lists (Extended Data Table~\ref{tab:supp-top-geneset-pleiotropy-beta-uncorrected-longtable}) were broader and more pathway-dense (especially lipid/lipoprotein and ciliary modules), whereas corrected $\beta$ retained a more conservative core of robust cross-trait signals. This pattern is expected: relaxed evidence thresholds recover additional plausible pathways but also increase susceptibility to broad, high-connectivity annotations. We therefore treat $\beta$ rankings as the primary calibrated view and $\beta_\text{uncorrected}$ as a sensitivity analysis of pathway breadth.
+
+% ANALYSIS IDEA: A formal test of context completeness could compare the fraction
+% of gene-trait pairs with high direct but low indirect support across different
+% annotation models. Models with fewer such "context gaps" are more complete.
+
+These results motivate a dual-use interpretation of context calibration. First, high indirect support identifies biology that is well captured by a chosen annotation context (here, mouse phenotypes plus curated pathways). Second, gene--trait pairs with strong direct evidence but weak indirect support identify biology that remains unexplained in that context---our ``context gaps.'' In this view, model selection is not only about maximizing predictive performance, but also about quantifying annotation completeness: what each context explains, what it misses, and where complementary contexts (e.g., text-mining-based models) are likely to add biological coverage.
+
+% --- Main Table: Corrected Beta Pleiotropy (vertical stacked layout) ---
+\begin{table*}[t!]
+\caption{Top pleiotropic gene sets across trait-group stratifications in the Mouse+MSigDB model (corrected $\beta$ score). Values are inverse-correlation-weighted pleiotropy sums with posterior-transformed Bayes factors.}
+\label{tab:top-geneset-pleiotropy-beta}
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+
+\vspace{4pt}
+\textbf{(a) All traits}\\[2pt]
+\begin{tabular}{@{} r l r @{}}
+\toprule
+ & \textbf{Gene set} & \textbf{Score} \\
+\midrule
+1 & HJURP\_TARGET\_GENES & 134.7 \\
+2 & WP\_CILIOPATHIES & 133.3 \\
+3 & MT & 132.7 \\
+4 & DROSHA\_TARGET\_GENES & 123.1 \\
+5 & GOBP\_LIPID\_HOMEOSTASIS & 111.2 \\
+6 & WP\_TYPE\_I\_COLLAGEN\_SYNTHESIS\_IN\_THE\_CONTEXT\_OF\_OSTEOGENESIS\_IMPERFECTA & 81.5 \\
+7 & chr7q11 & 63.6 \\
+8 & chrYq11 & 58.9 \\
+9 & WP\_PORTO\_SINUSOIDAL\_VASCULAR\_DISEASE & 58.6 \\
+10 & WP\_INTRACELLULAR\_TRAFFICKING\_PROTEINS\_INVOLVED\_IN\_CMT\_NEUROPATHY & 57.9 \\
+\bottomrule
+\end{tabular}
+
+\vspace{8pt}
+\textbf{(b) GWAS catalog traits}\\[2pt]
+\begin{tabular}{@{} r l r @{}}
+\toprule
+ & \textbf{Gene set} & \textbf{Score} \\
+\midrule
+1 & GOBP\_LIPID\_HOMEOSTASIS & 96.9 \\
+2 & REACTOME\_PLASMA\_LIPOPROTEIN\_ASSEMBLY\_REMODELING\_AND\_CLEARANCE & 48.2 \\
+3 & WP\_CHOLESTEROL\_METABOLISM & 31.3 \\
+4 & GOBP\_TRIGLYCERIDE\_METABOLIC\_PROCESS & 29.8 \\
+5 & WP\_ALLOGRAFT\_REJECTION & 21.9 \\
+6 & mp\_decreased\_circulating\_HDL\_cholesterol\_level & 20.3 \\
+7 & GOBP\_STEROL\_METABOLIC\_PROCESS & 20.3 \\
+8 & GOBP\_ANTIGEN\_PROCESSING\_AND\_PRESENTATION & 17.6 \\
+9 & KEGG\_GLYCOSPHINGOLIPID\_BIOSYNTHESIS\_LACTO\_AND\_NEOLACTO\_SERIES & 13.9 \\
+10 & GOBP\_STEROL\_TRANSPORT & 13.0 \\
+\bottomrule
+\end{tabular}
+
+\vspace{8pt}
+\textbf{(c) Portal traits}\\[2pt]
+\begin{tabular}{@{} r l r @{}}
+\toprule
+ & \textbf{Gene set} & \textbf{Score} \\
+\midrule
+1 & GOBP\_LIPID\_HOMEOSTASIS & 12.5 \\
+2 & mp\_short\_tibia & 8.6 \\
+3 & REACTOME\_PLASMA\_LIPOPROTEIN\_ASSEMBLY\_REMODELING\_AND\_CLEARANCE & 7.8 \\
+4 & DESCARTES\_MAIN\_FETAL\_ERYTHROBLASTS & 7.7 \\
+5 & mp\_shortened\_circadian\_behavior\_period & 7.5 \\
+6 & WP\_8P23\_1\_CNV\_SYNDROME & 7.5 \\
+7 & HALLMARK\_HEME\_METABOLISM & 7.3 \\
+8 & mp\_decreased\_circulating\_HDL\_cholesterol\_level & 6.8 \\
+9 & mp\_decreased\_heart\_rate & 6.3 \\
+10 & GOBP\_CARTILAGE\_DEVELOPMENT & 6.3 \\
+\bottomrule
+\end{tabular}
+
+\vspace{8pt}
+\textbf{(d) Rare disease traits}\\[2pt]
+\begin{tabular}{@{} r l r @{}}
+\toprule
+ & \textbf{Gene set} & \textbf{Score} \\
+\midrule
+1 & HJURP\_TARGET\_GENES & 134.7 \\
+2 & WP\_CILIOPATHIES & 133.3 \\
+3 & MT & 132.7 \\
+4 & DROSHA\_TARGET\_GENES & 123.1 \\
+5 & WP\_TYPE\_I\_COLLAGEN\_SYNTHESIS\_IN\_THE\_CONTEXT\_OF\_OSTEOGENESIS\_IMPERFECTA & 81.5 \\
+6 & chr7q11 & 63.6 \\
+7 & chrYq11 & 58.9 \\
+8 & WP\_PORTO\_SINUSOIDAL\_VASCULAR\_DISEASE & 58.6 \\
+9 & WP\_INTRACELLULAR\_TRAFFICKING\_PROTEINS\_INVOLVED\_IN\_CMT\_NEUROPATHY & 57.9 \\
+10 & REACTOME\_CILIUM\_ASSEMBLY & 48.6 \\
+\bottomrule
+\end{tabular}
+
+\end{table*}
