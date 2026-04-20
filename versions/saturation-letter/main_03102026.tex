@@ -1,0 +1,89 @@
+
+% PIGEAN Saturation Letter VERSION 03042026
+% Nature Letter format
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[sn-nature,lineno]{sn-jnl}% Style for submissions to Nature Portfolio journals
+
+%%%% Standard Packages
+\geometry{a4paper, margin=1in}
+
+% Change font to arial 
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+
+\usepackage{graphicx}%
+\usepackage{multirow}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{amsthm}%
+\usepackage{mathrsfs}%
+\usepackage[title]{appendix}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
+\usepackage{algorithm}%
+\usepackage{algorithmicx}%
+\usepackage{algpseudocode}%
+\usepackage{listings}%
+\usepackage{subcaption}
+\usepackage{comment}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows}
+\usepackage{luacode}
+\usepackage{pdfpages}
+\usepackage{hyperref}
+%%%%
+
+\raggedbottom
+
+\begin{document}
+
+\title[Article Title]{The Genetic Discovery Cycle: GWAS Saturation Across the Phenome Reveals the Bottleneck Has Shifted from Power to Annotations}
+
+%%=============================================================%%
+%% Author information - to be filled in
+%%=============================================================%%
+
+\author*[1,2]{\fnm{First} \sur{Author}}\email{iauthor@gmail.com}
+
+\author[2,3]{\fnm{Second} \sur{Author}}\email{iiauthor@gmail.com}
+\equalcont{These authors contributed equally to this work.}
+
+\author[1,2]{\fnm{Third} \sur{Author}}\email{iiiauthor@gmail.com}
+\equalcont{These authors contributed equally to this work.}
+
+\affil*[1]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{100190}, \state{State}, \country{Country}}}
+
+\affil[2]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{10587}, \state{State}, \country{Country}}}
+
+\affil[3]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{610101}, \state{State}, \country{Country}}}
+
+%%==================================%%
+%% Abstract
+%%==================================%%
+
+\abstract{
+Genome-wide association studies (GWAS) have transformed human genetics, but the assumption that ever-larger sample sizes will proportionally yield new biological insight remains largely untested across the phenome. Here we distinguish three levels of genetic discovery---variant identification, gene identification, and mechanism identification---and show that these follow distinct trajectories as statistical power increases. Using PIGEAN\cite{}, a Bayesian framework that separately quantifies direct genetic support (gene-trait association) and indirect genetic support (gene-trait relevance via shared functional annotations), we trace discovery accumulation across {{NUM_TRAITS_SATURATION_ANALYSIS}} common traits by downsampling GWAS summary statistics. We find that {{PERCENT_TRAITS_SATURATED}}\% of traits show evidence of saturation for gene discovery: new GWAS loci continue to emerge, but the genes they implicate are already supported by existing associations and their functional annotations. The remaining traits split between power-limited ({{NUM_TRAITS_POWER_LIMITED}} traits, where larger GWAS will yield genuinely new gene discoveries) and annotation-limited ({{NUM_TRAITS_ANNOTATION_LIMITED}} traits, where current functional annotations are insufficient to propagate signal to relevant genes). These findings suggest that, for a substantial fraction of the phenome, the bottleneck to biological discovery has shifted from statistical power to the quality and completeness of functional annotations. Continued investment in GWAS alone will yield diminishing returns for these traits; instead, resources should be directed toward curating and generating causally relevant biological annotations.
+}
+
+\keywords{GWAS, gene discovery, saturation, functional annotations, resource allocation}
+
+\maketitle
+
+\newpage
+
+\input{sections/saturation-letter/03102026/introduction_03102026}
+
+\input{sections/saturation-letter/03102026/framework_03102026}
+
+\input{sections/saturation-letter/03102026/results_03102026}
+
+\input{sections/saturation-letter/03102026/implications_03102026}
+
+\input{sections/saturation-letter/03102026/methods_03102026}
+
+\bibliography{references}% common bib file
+
+\end{document}

@@ -1,0 +1,243 @@
+
+% PIGEAN VERSION 11182025
+% Template Version: Version 3 October 2023
+% See section 11 of the User Manual for version history
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%                                                                 %%
+%% Please do not use \input{...} to include other tex files.       %%
+%% Submit your LaTeX manuscript as one .tex document.              %%
+%%                                                                 %%
+%% All additional figures and files should be attached             %%
+%% separately and not embedded in the \TeX\ document itself.       %%
+%%                                                                 %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%\documentclass[referee,sn-basic]{sn-jnl}% referee option is meant for double line spacing
+
+%%=======================================================%%
+%% to print line numbers in the margin use lineno option %%
+%%=======================================================%%
+
+%%\documentclass[lineno,sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
+
+%%======================================================%%
+%% to compile with pdflatex/xelatex use pdflatex option %%
+%%======================================================%%
+
+%%\documentclass[pdflatex,sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
+
+
+%%Note: the following reference styles support Namedate and Numbered referencing. By default the style follows the most common style. To switch between the options you can add or remove Numbered in the optional parenthesis. 
+%%The option is available for: sn-basic.bst, sn-vancouver.bst, sn-chicago.bst%  
+ 
+\documentclass[sn-nature,lineno]{sn-jnl}% Style for submissions to Nature Portfolio journals
+%%\documentclass[sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
+%%\documentclass[sn-mathphys-num]{sn-jnl}% Math and Physical Sciences Numbered Reference Style 
+%%\documentclass[sn-mathphys-ay]{sn-jnl}% Math and Physical Sciences Author Year Reference Style
+%%\documentclass[sn-aps]{sn-jnl}% American Physical Society (APS) Reference Style
+%%\documentclass[sn-vancouver,Numbered]{sn-jnl}% Vancouver Reference Style
+%%\documentclass[sn-apa]{sn-jnl}% APA Reference Style 
+%%\documentclass[sn-chicago]{sn-jnl}% Chicago-based Humanities Reference Style
+
+%%%% Standard Packages
+%%<additional latex packages if required can be included here>
+
+% Changing geoemtry to look better (imo)
+\geometry{a4paper, margin=1in}
+
+% Change font to arial 
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+
+\usepackage{graphicx}%
+\usepackage{multirow}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{amsthm}%
+\usepackage{mathrsfs}%
+\usepackage[title]{appendix}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
+\usepackage{longtable}%
+\usepackage{algorithm}%
+\usepackage{algorithmicx}%
+\usepackage{algpseudocode}%
+\usepackage{listings}%
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage{comment}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows}
+% \usepackage{luacode} % Removed: requires LuaTeX, not compatible with pdflatex
+\usepackage{pdfpages}
+\usepackage{hyperref}
+%%%%
+
+%%%%%=============================================================================%%%%
+%%%%  Remarks: This template is provided to aid authors with the preparation
+%%%%  of original research articles intended for submission to journals published 
+%%%%  by Springer Nature. The guidance has been prepared in partnership with 
+%%%%  production teams to conform to Springer Nature technical requirements. 
+%%%%  Editorial and presentation requirements differ among journal portfolios and 
+%%%%  research disciplines. You may find sections in this template are irrelevant 
+%%%%  to your work and are empowered to omit any such section if allowed by the 
+%%%%  journal you intend to submit to. The submission guidelines and policies 
+%%%%  of the journal take precedence. A detailed User Manual is available in the 
+%%%%  template package for technical guidance.
+%%%%%=============================================================================%%%%
+
+%% as per the requirement new theorem styles can be included as shown below
+\theoremstyle{thmstyleone}%
+\newtheorem{theorem}{Theorem}%  meant for continuous numbers
+%%\newtheorem{theorem}{Theorem}[section]% meant for sectionwise numbers
+%% optional argument [theorem] produces theorem numbering sequence instead of independent numbers for Proposition
+\newtheorem{proposition}[theorem]{Proposition}% 
+%%\newtheorem{proposition}{Proposition}% to get separate numbers for theorem and proposition etc.
+
+\theoremstyle{thmstyletwo}%
+\newtheorem{example}{Example}%
+\newtheorem{remark}{Remark}%
+
+\theoremstyle{thmstylethree}%
+\newtheorem{definition}{Definition}%
+
+%% New commands
+% Probablity Dist function
+\newcommand{\prob}{\text{Pr}}
+% Variable lookup function
+\newcommand{\getvar}[1]{\directlua{lookup("#1")}}
+
+\raggedbottom
+%%\unnumbered% uncomment this for unnumbered level heads
+
+\begin{document}
+
+\title[Article Title]{Indirect Genetic Support: A Probabilistic Framework for Distinguishing Disease-Relevant from Disease-Associated Genes}
+
+% Alternative titles:
+% - A Probabilistic Evidence Map of Gene-Trait Relevance Across the Phenome
+% - Calibrating Non-Genetic Evidence with Genetics to Map Gene-Trait Relevance
+% - PIGEAN: Using Genetic Associations to Calibrate Functional Annotations Across the Phenome
+
+
+%%=============================================================%%
+%% GivenName	-> \fnm{Joergen W.}
+%% Particle	-> \spfx{van der} -> surname prefix
+%% FamilyName	-> \sur{Ploeg}
+%% Suffix	-> \sfx{IV}
+%% \author*[1,2]{\fnm{Joergen W.} \spfx{van der} \sur{Ploeg} 
+%%  \sfx{IV}}\email{iauthor@gmail.com}
+%%=============================================================%%
+
+\author*[1,2]{\fnm{First} \sur{Author}}\email{iauthor@gmail.com}
+
+\author[2,3]{\fnm{Second} \sur{Author}}\email{iiauthor@gmail.com}
+\equalcont{These authors contributed equally to this work.}
+
+\author[1,2]{\fnm{Third} \sur{Author}}\email{iiiauthor@gmail.com}
+\equalcont{These authors contributed equally to this work.}
+
+\affil*[1]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{100190}, \state{State}, \country{Country}}}
+
+\affil[2]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{10587}, \state{State}, \country{Country}}}
+
+\affil[3]{\orgdiv{Department}, \orgname{Organization}, \orgaddress{\street{Street}, \city{City}, \postcode{610101}, \state{State}, \country{Country}}}
+
+%%==================================%%
+%% Sample for unstructured abstract %%
+%%==================================%%
+
+\abstract{
+Drug targets with human genetic support are more than twice as likely to succeed in clinical trials, yet genetic associations directly implicate only a fraction of disease-relevant genes. A gene may also be disease-relevant through \textit{indirect genetic support}: the extent to which it shares functional annotations---such as pathway membership, mouse knockout phenotypes, or expression patterns---with other genes that are directly associated with a trait. Here we introduce PIGEAN, a Bayesian framework that uses genetic associations as an anchor to calibrate {{NUM_TOTAL_GENE_ANNOTATIONS:,}} functional annotations and quantify both direct and indirect genetic support for any gene-trait pair. Applied to {{NUM_TOTAL_TRAITS_MOUSE_MSIGDB:,}} traits, PIGEAN produces {{NUM_GENETRAIT_REL_PP50:,}} calibrated gene-trait relationships at posterior probability above 50\%, expanding the genetically supported landscape by an order of magnitude. We validate these predictions on three independent axes: indirect support predicts held-out genetic associations in leave-one-chromosome-out and temporal analyses ($p = {{TEMPORAL_DELTA_R2_BETA_P}}$), prioritizes drug targets at clinical success rates exceeding those of the Open Targets Platform and comparable to Open Targets Genetics L2G scores (relative success = {{MINIKEL_OTG_RS:.2f}}) while identifying {{NUM_PIGEAN_PRIORITIZED_TARGETS_MOUSE_MSIGDB_AT_RS_eq_MINIKEL_OTG_INDIRECT:,}} targets compared to {{NUM_MINIKEL_OTG_PRIORITIZED_TARGETS:,}} from L2G alone, and enriches for causal genes in rare disease patients. Across the phenome, the resulting resource classifies {{NUM_UNDERSTOOD_MECHANISMS:,}} gene-trait pairs as understood mechanisms with convergent direct and indirect evidence, flags {{NUM_NOVEL_DISCOVERIES:,}} as novel discoveries lacking pathway annotation, and generates mechanistic hypotheses for individual genes---for example, decomposing the \textit{HLA-DRB1} effect in multiple sclerosis into a three-stage immune cascade that explains the known sex paradox in disease progression. These results establish indirect genetic support as a quantitative and scalable measure of gene-trait relevance distinct from genetic association, and provide a dense probabilistic map of gene-trait relationships across the human phenome.
+}
+
+%%================================%%
+%% Sample for structured abstract %%
+%%================================%%
+
+% \abstract{\textbf{Purpose:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.
+% 
+% \textbf{Methods:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.
+% 
+% \textbf{Results:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.
+% 
+% \textbf{Conclusion:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.}
+
+\keywords{keyword1, Keyword2, Keyword3, Keyword4}
+
+%%\pacs[JEL Classification]{D8, H51}
+
+%%\pacs[MSC Classification]{35A01, 65L10, 65L12, 65L20, 65L70}
+
+\maketitle
+
+\newpage
+\tableofcontents
+\newpage
+
+\input{sections/indirect-support/03302026/introduction_03302026}
+
+\section{Results}
+
+% Results story (updated 03/04/2026 - refactored for method-focused paper):
+% 1. Framework overview - direct vs indirect support, the PIGEAN model
+% 2. Validation: indirect predicts direct (LOCO, temporal, rare disease)
+% 3. Context-dependent relevance: which annotations for which contexts
+% 4. Drug target prioritization: RS analysis
+% 5. Rare disease gene enrichment: clinical validation
+% 6. Phenome-wide resource description
+%
+% NOTE: Discovery cycle / saturation analysis moved to companion paper
+% (saturation-letter). See versions/saturation-letter/main_03042026.tex
+
+\input{sections/indirect-support/03302026/methods_overview_03302026}
+
+\input{sections/indirect-support/03302026/validation_genetics_03302026}
+
+\input{sections/indirect-support/03302026/biological_properties_03302026}
+
+\input{sections/indirect-support/03302026/geneset_context_03302026}
+
+\input{sections/indirect-support/03302026/validation_pharma_03302026}
+
+\input{sections/indirect-support/03302026/validation_clinical_03302026}
+
+\input{sections/indirect-support/03302026/resource_description_03302026}
+
+\input{sections/indirect-support/03302026/discussion_03302026}
+
+\bibliography{references}% common bib file
+
+% Methods section
+\newpage
+\input{sections/indirect-support/03302026/methods_03302026}
+
+% Extended Data (figures and tables)
+\newpage
+\input{sections/indirect-support/03302026/extended_data_03302026}
+
+% Supplementary Information (detailed derivations)
+\newpage
+\input{sections/indirect-support/03302026/supplementary_03302026}
+
+
+\end{document}
+
+% Some notes
+% - pigean indirect + direct over common
+% - pigean indirect over common (A2F and/or GWAS Cat)
+% - combined
+% - piccolo
+% - OTG - All
+% - magma 
+% - bar or point
+% - Temporal figure of indirect support regress magma2d
+% - Take temporal direct support out 2c and cite in paper
+
+
+% 3x2 for figure. Panel A is RS, Panel B is 1d
+
+% We developed pigean and applied to XXXX common traits, predicted RS, and held when holding out future whatever. 

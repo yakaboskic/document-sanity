@@ -1,0 +1,50 @@
+\subsection{Indirect Support Interpretively Predicts Direct Genetic Support}
+
+%1. Hold out cross validation to show indirect predicts direct
+%2. Temporal to show combined predicts future
+%3. Stratify across trait architectures and sample size, rare vs. common
+%4. Bias towards well studied genes or traits with higher power
+%5. Comparison to direct only baseline
+
+% Figure 2 panels
+%a. Show indirect predicts direct in hold one out chromosome (portal_model)
+%b. Show mechanistic alignment in portal model results compared to null for combined
+%c. Show relative success results compared to benchmarks for combined (portal model)
+%d. Show it predicts future GWAS signal (portal) 
+
+% Add how many more indirect genes vs only direct
+% Plot - standard direct vs indirect plot and show orthongality.
+% direct support is probablistic nearest gene
+% Merge Cross chromosome lines for each trait
+% Plot of sample size to demostrate calibration with direct support
+% Another figure to show miami plot 
+
+% What is a trait architecture?
+% How do I show the bias towards well studied genes or traits with higher power?
+
+% Think of threshold of cimbined as FDR (False Discovery Rate) based on Bayes Factors. TATTA paper has the FDR. 
+
+% Relevant genes are if you perturb them they fuck up. However we can't perturn everything in humans to learn this because of ethics and cost.
+% So how might relevant genes show up.
+% - Successful drug targets would be a nice proxy, because they would target relevant genes no matter if they show up in GWAS.
+% - Pertub seq data could also be leveraged maybe? That would support the causality of relevant gene definition. 
+
+
+\begin{figure}[t!]
+    \centering
+    {{canva:4}}
+    \caption{}
+    \label{fig:validation-genetics}
+\end{figure}
+
+% Explanation of Panel A and B showing indirect predicts direct in rare and common disease.
+Here, we evaluate indirect support along the genetic evidence axis spanning both common and rare traits. For common traits, we tested whether indirect support can predict direct genetic support using a leave-one-chromosome-out (LOCO) cross-validation across 12 validation traits (Supplementary Table \ref{tab:common-validation-traits}). In each fold, indirect support was learned from all chromosomes except one, and these scores were then used to predict direct genetic support on the held-out chromosome (Figure \ref{fig:validation-genetics}a). Indirect support significantly predicted direct genetic support for every held-out chromosome across all 12 traits (Supplementary Table \ref{tab:loco-validation}; trait-level $\beta$ range {{MIN_LOCO_BETA}} to {{MAX_LOCO_BETA}}, all $p$={{MAX_LOCO_BETA_P}}), and the fitted relationships consistently fell below the $y=x$ calibration line, indicating a systematic underestimation of direct support. This conservative bias is expected: NEED AN INTERPRETATION. Because LOCO validation is not feasible for rare diseases, we performed an analogous evaluation across 40 rare traits (Supplementary Table \ref{tab:rare-validation-traits}) using OMIM disease–gene annotations curated by Orphanet as a proxy for direct support. For each disease, we held out one known disease gene and asked how often it was recovered among the top-$K$ indirectly prioritized genes, summarized by a cumulative match characteristic (CMC) curve (Figure \ref{fig:validation-genetics}b). Indirect support recovered held-out rare disease genes with a CMC-AUC of {{RARE_CMC_AUC}} (95\% CI: {{RARE_CMC_AUC_CI_LOWER}} - {{RARE_CMC_AUC_CI_UPPER}}) and a Mean Reciprocal Rank (MRR) of {{RARE_MRR}} (95\% CI: {{RARE_MRR_CI_LOWER}} - {{RARE_MRR_CI_UPPER}}), where MRR is the average of $1/r$ across diseases (with $r$ being the rank of the held-out gene). An MRR of {{RARE_MRR}} implies the true gene is typically ranked within the top $~\sim$5-10 candidates (since $1/{{RARE_MRR}}\approx 8$) and far earlier than expected by chance in a genome-wide ranking. Consistent with this, {{RARE_RATIO_OF_PREDICTED_GENES_IN_TOP_1000}}\% of held-out genes appeared within the top 1000 predictions. In all analyses, we leveraged the most performant model chosen via model selection (Methods; Model Selection) that included two geneset libraries made up of mouse phenotypes and MSigDB genesets.
+
+% Temporal validation of indirect support predicting future GWAS signal
+Next, we sought to control for any potential circularity caused by genetic annotations that may have been informed by genetic data (GWAS or otherwise). We did this by curating a temporal validation set of 67 common traits that had a GWAS published before and after 2018 such that the GWAS published after 2018 had higher statistical power. We then leveraged the same Mouse + MSigDB model (described earlier) however using an older version of mouse phenptypes and MSigDB published before 2018. We then calculated gene-level MAGMA \cite{} Z-scores (as another independent metric of direct genetic support) from both the pre- and post-2018 GWAS for each trait. We then regressed the post-2018 MAGMA Z-scores on the pre-2018 MAGMA Z-scores for each trait while progressively restricting to genes meeting increasing thresholds of indirect genetic support (Figure \ref{fig:validation-genetics}c). We measured the improvement in model fit ($\Delta R^2$) of this regression as a function of the indirect genetic support threshold finding a statistically significant effect of {{TEMPORAL_DELTA_R2_BETA}} (p={{TEMPORAL_DELTA_R2_BETA_P}}) for indirect support to predict future GWAS signal. Together, these temporal validations support that PIGEAN is not simply recapitulating latent GWAS or drug target information embedded in curated libraries, but instead enriches for signals that are predictive of future discoveries. 
+
+% conservative bias explanation, not all genes will have direct support on each axis but indirect support will still predict that they do even tho they won't rise to population significance level so we would expect the regression slope to be less than 1. Consistant with our expectation that not all disease relevant genes have variant association, we would expect this downward bias to be present. 
+% Taking up what indirect support is, instead of validating it. 
+
+% Show that the genesets used for prediction are interpretable and make sense and there is only a few that converge and that they also get deduplicated.
+We then evaluated the interpretability of PIGEAN by examining the quantity and quality of significant genesets inferred by the same model over the entire set of traits (N={{NUM_TRAITS_MOUSE_MSIGDB_CONVERGED}}) as these effect sizes govern the calculation of indirect genetic support (Methods). We found that $\sim${{PERCENTAGE_OF_TRAITS_WITH_LESS_THAN_100_GENESETS}}\% ({{NUM_TRAITS_WITH_LESS_THAN_100_GENESETS}} of {{NUM_TRAITS_MOUSE_MSIGDB_CONVERGED}}) had fewer than 100 genesets predicted as significant (Figure~\ref{fig:validation-genetics}d), defined as joint effect size $\beta > 0.01$ (Methods). We then examined the quality of these significant genesets by calculating the semantic similarity between all significant genesets for a specific phenotype and the associated phenotype name and description (Figure~\ref{fig:validation-genetics}e). We found that the average phenotypic similarity (cosine similarity) was significantly greater than the random null ({{MEAN_PHENOTYPIC_SIMILARITY_OF_SIGNIFICANT_GENESETS}} compared to {{MEAN_PHENOTYPIC_SIMILARITY_OF_RANDOM_NULL}}; one-sided Welch's $t$-test with $t$={{T_STATISTIC_PHENOTYPIC_SIMILARITY}}, $p \ll 0.001$). Lastly, to validate how PIGEAN distributes signal across overlapping genesets, we investigated the relationship between marginal and joint geneset effects across traits. Under a simple approximation, marginal annotation effects can be viewed as joint effects filtered through the geneset overlap structure, so that overlapping genesets repeatedly capture the same latent biological signals, while joint effects deconfound this redundancy. Consistent with this redundancy-collapse interpretation, we observed that the total joint effect across genesets scales approximately with the square root of the total marginal effect (across $>${{NUM_TRAITS_MOUSE_MSIGDB_CONVERGED}} traits, $S_{\mathrm{joint}} \approx 0.8437\sqrt{S_{\mathrm{marg}}} - 1.02$; $R^2=0.769$; $p \ll 0.001$), suggesting that our geneset library redundantly encodes a smaller set of underlying biological processes that PIGEAN resolves into more interpretable joint effects.

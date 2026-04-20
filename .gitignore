@@ -1,0 +1,85 @@
+# LaTeX intermediate and output files
+*.aux
+*.bbl
+*.blg
+*.brf
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
+*.xdv
+*.pdfsync
+*.synctex
+*.dvi
+*.ps
+*.eps
+*.gz
+*.run.xml
+*.bcf
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.ist
+*.xdy
+*.idx
+*.ilg
+*.ind
+*.lof
+*.lot
+*.maf
+*.mtc*
+*.slg
+*.slo
+*.sls
+*.soc
+*.spt
+*.sta
+*.stc
+*.stf
+*.sty
+*.svgz
+*.thm
+*.tmp
+*.upa
+*.upb
+*.synctex(busy)
+
+# MacOS Finder files
+.DS_Store
+
+# VSCode settings
+.vscode/
+
+# Overleaf/ShareLaTeX project files
+*.synctex.gz(busy)
+
+# Output PDF files (optional, comment out if you want to keep PDFs in git)
+*.pdf
+
+# Ignore build/ and output/ directories if present
+build/
+output/
+out/
+.tex/
+
+
+# Pyton scripts
+.venv/
+__pycache__/
+
+# UV
+uv.lock
+.python-version
+
+# Canva API credentials (keep the example!)
+.canva_config.json

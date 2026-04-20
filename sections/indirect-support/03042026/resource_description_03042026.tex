@@ -1,0 +1,27 @@
+\subsection{A Phenome-Wide Map of Gene-Trait Relevance}
+
+% STRUCTURE: This section summarizes the full phenome-wide application as a resource.
+% It answers: what does the field get from PIGEAN that it didn't have before?
+
+Applying the Mouse+MSigDB model across {{NUM_TOTAL_TRAITS_MOUSE_MSIGDB:,}} traits ({{NUM_COMMON_TRAITS_MOUSE_MSIGDB:,}} common, {{NUM_RARE_TRAITS_MOUSE_MSIGDB:,}} rare) and {{NUM_TOTAL_GENE_ANNOTATIONS:,}} gene annotations, PIGEAN produces a dense probabilistic map of gene-trait relevance. At a posterior probability threshold of 90\%, we identify {{NUM_GENETRAIT_REL_PP90:,}} gene-trait relationships---an average of {{NUM_PER_TRAIT_PP90}} genes per trait and {{NUM_PER_GENE_PP90}} traits per gene. At a more inclusive threshold of 50\%, this expands to {{NUM_GENETRAIT_REL_PP50:,}} relationships ({{NUM_PER_TRAIT_PP50}} per trait, {{NUM_PER_GENE_PP50}} per gene).
+
+% TODO: Add comparison to existing resources - how many gene-trait relationships
+% does Open Targets Genetics have? GWAS Catalog? Orphanet? This would quantify
+% the "orders of magnitude denser" claim from the abstract.
+
+% TODO: NUM_GENESET_TRAIT_ASSOC_MILLIONS - Describe the geneset-trait association landscape.
+Each gene-trait relationship is accompanied by provenance identifying the specific SNP associations or gene records contributing to direct support and the specific genesets contributing to indirect support. Across all traits, PIGEAN evaluates {{NUM_GENESET_TRAIT_ASSOC_MILLIONS}} million geneset-trait associations, retaining only those that survive the spike-and-slab regularization as non-zero contributors to indirect support.
+
+% TODO: Add a brief description of what users can do with this resource.
+% - Query a gene: which traits is it relevant to, and through which annotations?
+% - Query a trait: which genes are relevant, and which are novel (indirect-only)?
+% - Query a geneset: for which traits does it carry non-zero effect?
+% - Bring your own annotations: run PIGEAN with a new CRISPR screen or single-cell atlas
+
+% FIGURE SUGGESTION: A summary figure showing (a) density of gene-trait map vs. existing
+% resources, (b) distribution of direct vs indirect contributions across gene-trait pairs,
+% (c) example queries for a well-known gene (e.g., PCSK9) and a well-known trait (e.g., T2D).
+
+% ANALYSIS IDEA: Show that the resource captures gene-trait relationships not in any
+% existing curated database. How many PP>90% relationships have no corresponding
+% entry in Open Targets or GWAS Catalog?
