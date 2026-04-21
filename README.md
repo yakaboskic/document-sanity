@@ -1,161 +1,267 @@
 # latex-builder
 
-Build LaTeX documents from Markdown (or LaTeX) source files with variable substitution, figure management, and versioned builds.
+Build LaTeX documents, interactive HTML viewers, and preview-friendly markdown
+from a single Markdown source of truth. `manifest.yaml` is the one source of
+configuration per version; variables carry provenance; figures/equations/tables
+render both to PDF and to markdown-native previews for GitHub/VSCode/Obsidian.
 
-## How it works
+## What it does
 
-`latex-builder` provides a build pipeline for LaTeX manuscripts:
+| Command | Output | When to use |
+|---|---|---|
+| `latex-builder build --compile` | `out/<ver>/pdf/main.pdf` | Build the paper PDF. |
+| `latex-builder html --open` | `out/<ver>/html/index.html` | Interactive viewer: TOC sidebar, KaTeX math, clickable variables with a provenance panel, hyperlinked bibliography. |
+| `latex-builder preview` | Inline preview blocks in each `.md` | Make ```latex figure/equation/table blocks render as `![alt](path)` / `$$...$$` / `\|cell\|` so GitHub shows something meaningful. Idempotent; hash-tagged. |
+| `latex-builder preview --check` | Exit 1 if stale | CI-friendly. |
+| `latex-builder import` | New `src/<ver>/` tree | Convert an existing `\input{}`-style LaTeX project into the markdown-as-source-of-truth layout. |
+| `latex-builder new-version` | Copied `src/<ver>/` | Snapshot today's version from the previous one. |
+| `latex-builder init <name>` | Fresh project scaffold | Start a new manuscript project from scratch. |
+| `latex-builder convert file.md/.tex` | The other format | One-off md↔tex conversion (useful for scripting). |
 
-1. **Source files** live in `sections/<manuscript>/<version>/` as `.md` or `.tex` files
-2. **Variables** are defined in `variables/<manuscript>.json` and referenced with `{{VARIABLE}}` syntax
-3. **Figures** are managed via a `manifest.json` and referenced with `{{fig:id}}` syntax
-4. **Versions** are snapshots created with configurable naming: date-based, fun random names, or both
-5. **Build** processes all templates, substitutes variables, converts markdown to LaTeX, and outputs a clean compilation-ready directory
+## Use it in your paper project (recommended)
 
-## Install
+Create a separate repo for each paper and declare `latex-builder` as a
+dependency. This keeps paper content out of the tool's history and lets
+multiple papers track different versions independently.
 
-```bash
-pip install -e .
-# or with uv:
-uv pip install -e .
+**`pyproject.toml`** (paper repo):
+
+```toml
+[project]
+name = "my-paper"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "latex-builder @ git+https://github.com/yakaboskic/latex-builder.git@main",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true  # required for the git+ dependency
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true          # this repo has no importable Python
 ```
 
-## CLI
-
-### Build a manuscript
+Then:
 
 ```bash
-# Auto-detect latest version
-latex-builder build
-
-# Specific manuscript and version
-latex-builder build --manuscript my-paper --version 04202026
-
-# Build and compile to PDF
-latex-builder build --compile
-
-# Verbose with strict mode
-latex-builder build -v --strict
+uv sync                           # install latex-builder from GitHub
+uv run latex-builder build --compile
+uv run latex-builder html --open
 ```
 
-### Create a new version
+A reference `Makefile` for paper repos is in
+[`papers/pigean-indirect-support/Makefile`](https://github.com/yakaboskic/pigean-indirect-support/blob/main/Makefile)
+(targets: `install`, `build`, `pdf`, `preview`, `preview-check`, `html`, `serve`, `clean`).
+
+## Install the tool directly
+
+For local development on the tool itself:
 
 ```bash
-# From an existing version, using date + fun name (default)
-latex-builder new-version versions/my-paper/main_04202026.tex
-
-# Date only
-latex-builder new-version versions/my-paper/main_04202026.tex --strategy date
-
-# Fun name only (e.g., "elegant-crimson-fox")
-latex-builder new-version versions/my-paper/main_04202026.tex --strategy fun
-
-# Both (e.g., "04202026-elegant-crimson-fox")
-latex-builder new-version versions/my-paper/main_04202026.tex --strategy both
-
-# Preview without writing
-latex-builder new-version versions/my-paper/main_04202026.tex --dry-run
+git clone https://github.com/yakaboskic/latex-builder
+cd latex-builder
+uv sync
+uv run latex-builder --help
 ```
 
-### Convert markdown to LaTeX
+## Project layout
 
-```bash
-# Convert a single file
-latex-builder convert content.md -o content.tex
-
-# Don't escape LaTeX special chars (for source with embedded LaTeX)
-latex-builder convert content.md --no-escape
-```
-
-## Project structure
-
-A `latex-builder` project looks like:
+A paper project has this shape:
 
 ```
 my-paper/
-  versions/
-    my-paper/
-      main_04202026.tex              # Main document (references sections)
-      main_04202026-swift-fox.tex    # Another version
-  sections/
-    my-paper/
-      04202026/
-        introduction.md              # Markdown source
-        methods.tex                  # Or pure LaTeX source
-        results.md
-      04202026-swift-fox/
-        ...
-  variables/
-    my-paper.json                    # Variables for substitution
-    shared.json                      # Shared across manuscripts
-  figures/
-    my-paper/
-      figure1.png
-    manifest.json                    # Figure definitions
-  references.bib                     # Bibliography
-  *.cls, *.bst                       # LaTeX class/style files
-  build/                             # Generated output (gitignored)
-    my-paper/
-      main_current.tex
-      sections/*.tex
-      figures/*
-      README.md
+├── pyproject.toml              # declares latex-builder dependency
+├── templates/
+│   ├── article.tex             # or nature.tex for sn-jnl (Springer Nature)
+│   ├── *.cls / *.bst           # class + bib style files copied into build
+├── src/
+│   ├── 03302026/               # MMDDYYYY-named version directory
+│   │   ├── manifest.yaml       # single source of configuration
+│   │   ├── docs/               # *.md sections, in manifest.sections order
+│   │   ├── figures/            # png/jpg/pdf/html images
+│   │   ├── tables/             # optional: legacy .tex tables (can inline)
+│   │   └── references.bib      # bibliography
+│   └── 04202026-elegant-fox/   # another snapshot
+└── out/                        # generated — gitignored
+    └── 03302026/
+        ├── latex/main.tex      # compilation-ready LaTeX
+        ├── pdf/main.pdf        # compiled PDF
+        └── html/index.html     # interactive viewer
 ```
 
-## Variable syntax
+## manifest.yaml
 
-In your `.md` or `.tex` source files:
+Single source of truth per version:
 
+```yaml
+metadata:
+  title: "My Paper Title"
+  authors:
+    - name: "First Author"
+      email: "first@example.com"
+      affiliations: [1]
+  affiliations:
+    1:
+      department: "Department"
+      institution: "University"
+  abstract: |
+    Paper abstract. Variable tokens like {{NUM_SAMPLES:,}} and inline math
+    $p = {{PVAL:.2e}}$ are substituted at build time.
+  keywords: [genetics, drug-targets, bayesian]
+  template: nature              # or article; loads templates/<name>.tex
+
+sections:
+  - docs/introduction.md
+  - docs/methods.md
+  - docs/results.md
+  - docs/discussion.md
+  - _bibliography              # pseudo-section: inserts \bibliography{} here
+  - docs/supplementary.md
+
+variables:
+  NUM_SAMPLES: 1000             # simple form
+  PVAL:                         # full form with provenance (powers the
+    value: 0.0087               # interactive HTML viewer's panel)
+    provenance:
+      source: data/results.csv
+      data: [data/raw.parquet]
+      command: python scripts/fit.py --out data/results.csv
+      description: Primary p-value from the genome-wide regression.
+      updated: "2026-04-20"
+
+figures:
+  fig_1:
+    source: figures/overview.png
+    width: "\\textwidth"
+  "2":                          # canva page mapping; {{canva:2}} resolves here
+    source: figures/pigean-figure-1.png
+
+tables:
+  results_summary:
+    source: tables/results.tex
+    format: latex
 ```
-The p-value was {{PVALUE:.2e}}.
-The R-squared was {{R2:.2f}}.
-We analyzed {{NUM_TRAITS:,}} traits.
-```
 
-Supported format specs: `:.Nf` (decimals), `:.Ne` (scientific), `:,` (thousands), `:.N%` (percentage).
-
-Undefined variables render as `XXXX` (configurable) and are reported in the build summary.
-
-## Markdown source
-
-Source files can be markdown with YAML frontmatter:
+## Variable and figure syntax in markdown
 
 ```markdown
----
-title: My Paper
-author: Chase
----
-
-# Introduction
-
-This is the **introduction** with `inline code` and a variable: {{NUM_SAMPLES:,}}.
-
-## Methods
-
-1. First step
-2. Second step
+We analyzed {{NUM_SAMPLES:,}} samples ($p = {{PVAL:.2e}}$).
 
 ```latex
-% Raw LaTeX passes through unchanged
-\begin{equation}
-  E = mc^2
-\end{equation}
+\begin{figure}[h!]
+    \centering
+    {{fig:fig_1}}
+    \caption{Framework overview.}
+    \label{fig:overview}
+\end{figure}
+```
 ```
 
-> This blockquote becomes a LaTeX quote environment.
+**Supported format specs** (Python-style): `:.2f`, `:.2e`, `:,`, `:.1%`.
+
+Undefined variables render as `XXXX` (configurable via `--placeholder`) and
+are reported in the build summary.
+
+## Preview blocks
+
+`latex-builder preview` auto-generates a markdown approximation next to each
+```latex block so GitHub renders something useful:
+
+~~~markdown
+```latex
+\begin{figure}[h!]
+    \includegraphics[width=\textwidth]{figures/overview.png}
+    \caption{Framework overview.}
+    \label{fig:overview}
+\end{figure}
 ```
 
-The markdown is converted to LaTeX during build. You can also use pure `.tex` files in any section.
+<!-- latex-builder:preview:begin hash=a1b2c3d4 -->
+![Framework overview.](../figures/overview.png)
+<!-- latex-builder:preview:end -->
+~~~
 
-## Version naming
+- Block kinds handled: `figure`/`figure*`, `table`/`table*`/`longtable`,
+  `align`/`equation`/`eqnarray`/`gather`/`multline` and their starred variants.
+- Template `\newcommand` macros (e.g. `\prob` → `\text{Pr}`) auto-expand inside
+  `$...$`, `$$...$$`, `\[...\]` math so KaTeX-based viewers don't choke.
+- `.pdf` figures fall back to a sibling `.png` if one exists (md viewers
+  can't render PDFs).
+- Paths are computed relative to the doc's own directory.
+- Hand-edits between `preview:begin/end` markers get overwritten; edit the
+  source ```latex block instead.
+- `preview --check` returns non-zero on drift — wire into CI.
 
-| Strategy | Example | Description |
-|----------|---------|-------------|
-| `date` | `04202026` | MMDDYYYY format |
-| `fun` | `elegant-crimson-fox` | Random name via [coolname](https://pypi.org/project/coolname/) |
-| `both` | `04202026-elegant-crimson-fox` | Date + fun name |
+## Interactive HTML viewer
 
-## Modeled after
+`latex-builder html` emits a single `index.html` (plus copied `figures/`)
+with:
 
-- **[word-builder](https://github.com/yakaboskic/word-builder)**: CLI architecture, markdown-as-source philosophy, content builder pattern
-- **[pigean-manuscripts](https://github.com/yakaboskic/pigean-manuscripts)**: Build system, variable processor, figure manifest, versioning scheme
+- Left sidebar TOC with scroll-spy and hyperlinked headings.
+- Client-side KaTeX math, with `\newcommand` macros from the template
+  registered automatically.
+- Clickable variable tokens — a **right-side provenance panel** slides in
+  showing description, an inputs→command→output graph, and the updated
+  timestamp. The clicked token stays outlined while the panel is open.
+- Hyperlinked bibliography: `\cite{key}` → numbered link → entry rendered
+  from `references.bib`.
+- Figures: `.png`/`.jpg` → `<img>`, `.html` → `<iframe>` (great for Plotly),
+  `.pdf` → `<embed>`.
+- Self-contained: only external deps are Tailwind Play CDN and KaTeX CDN.
+  Serve with `python3 -m http.server` from the `html/` directory.
+
+## Build pipeline
+
+```
+src/<ver>/docs/*.md   ──┐
+src/<ver>/manifest.yaml ─┼─► out/<ver>/latex/main.tex  ──► out/<ver>/pdf/main.pdf
+templates/<tmpl>.tex  ──┘                    └─ bibtex resolved (pdflatex runs
+                                                in the latex/ dir so
+                                                openout_any=p doesn't block)
+```
+
+Section order and the bibliography placement are controlled from
+`manifest.sections`. `_bibliography` is a pseudo-section that inserts
+`\bibliography{references}` at that point; `_toc` similarly for
+`\tableofcontents`.
+
+## Versioning
+
+```bash
+latex-builder new-version               # copy latest -> MMDDYYYY-<fun-name>/
+latex-builder new-version --strategy date    # MMDDYYYY
+latex-builder new-version --strategy fun     # elegant-crimson-fox
+latex-builder new-version --strategy both    # MMDDYYYY-elegant-crimson-fox (default)
+```
+
+`latex-builder build` / `html` / `preview` all auto-detect the latest
+dated version if `--version` isn't given.
+
+## Importing an existing LaTeX project
+
+```bash
+latex-builder import \
+  --source ./my-old-paper \
+  --target ./my-new-paper \
+  --manuscript indirect-support \
+  --version 03302026 \
+  --name 03302026
+```
+
+Walks `versions/<manuscript>/main_<ver>.tex` + `sections/<manuscript>/<ver>/*.tex`
+and produces a `src/<ver>/` tree: sections become `.md` with ```latex blocks
+preserving environments we can't losslessly markdown-ify (figures, tables,
+align, etc.), variables are copied from `variables/<manuscript>.json`, the
+bib and figures are brought along.
+
+## Library inspiration
+
+- [word-builder](https://github.com/yakaboskic/word-builder) — CLI architecture
+  and markdown-as-source philosophy.
+- [pigean-manuscripts](https://github.com/yakaboskic/pigean-manuscripts) —
+  original build system, variable processor, figure manifest, versioning scheme.
