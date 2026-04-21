@@ -64,6 +64,7 @@ class ManuscriptBuilder:
             placeholder=placeholder,
             figures={fid: entry for fid, entry in self.manifest.figures.items()},
             figures_dir=self.src_dir / "figures",
+            target="pdf",
         )
 
     def _resolve_template(self) -> str:
@@ -284,7 +285,9 @@ class ManuscriptBuilder:
         print(f"    Written: {self.out_main_file}")
 
     def copy_figures(self) -> int:
-        """Copy figures to output directory."""
+        """Copy figures to output directory, auto-cropping raster whitespace."""
+        from .figure_crop import copy_with_crop, pillow_available
+
         print(f"\n  Copying figures...")
         figures_src = self.src_dir / "figures"
         figures_dest = self.out_latex_dir / "figures"
@@ -294,16 +297,36 @@ class ManuscriptBuilder:
             return 0
 
         figures_dest.mkdir(parents=True, exist_ok=True)
-        count = 0
+
+        # Per-figure crop toggle: manifest entries can set `crop: false` to
+        # opt out. Lookup by basename since output is flat.
+        crop_by_stem: dict[str, bool] = {}
+        for fig_id, entry in self.manifest.figures.items():
+            for p in [entry.source] + list(entry.formats.values()):
+                if p:
+                    crop_by_stem[Path(p).stem] = entry.crop
+
+        n_copied = n_cropped = 0
         for ext in ['*.png', '*.jpg', '*.jpeg', '*.pdf', '*.eps', '*.svg']:
             for fig in figures_src.rglob(ext):
                 dest = figures_dest / fig.name
-                if not dest.exists():
-                    shutil.copy2(fig, dest)
-                    count += 1
+                crop = crop_by_stem.get(fig.stem, True)
+                mode, info = copy_with_crop(fig, dest, crop=crop)
+                if mode == 'cropped':
+                    n_cropped += 1
+                    n_copied += 1
+                    if self.verbose and info:
+                        print(f"    [cropped] {fig.name}: {info}")
+                elif mode == 'copied':
+                    n_copied += 1
 
-        print(f"    Copied {count} figures")
-        return count
+        msg = f"    Copied {n_copied} figures"
+        if pillow_available():
+            msg += f" ({n_cropped} cropped)"
+        else:
+            msg += " (Pillow not installed — cropping skipped)"
+        print(msg)
+        return n_copied
 
     def copy_tables(self) -> int:
         """Copy table files to output directory."""

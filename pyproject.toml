@@ -8,11 +8,11 @@ license = {text = "MIT"}
 dependencies = [
     "coolname>=4.0.0",
     "pyyaml>=6.0",
-]
-
-[project.optional-dependencies]
-figures = [
+    # Auto-cropping whitespace from raster figures during build. Soft-imported
+    # in figure_crop.py so missing Pillow degrades to plain copy rather than
+    # erroring out — but installing it is strongly recommended.
     "pillow>=10.0.0",
+    "numpy>=1.24",
 ]
 
 [project.scripts]

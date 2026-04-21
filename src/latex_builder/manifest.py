@@ -87,9 +87,29 @@ class VariableEntry:
 
 @dataclass
 class FigureEntry:
-    """A figure definition with optional provenance."""
+    """A figure definition with optional provenance.
+
+    A figure can declare multiple artifacts (one per format) so the right one
+    gets used for each build target — a `.pdf` for print-quality PDF, `.html`
+    for the interactive HTML viewer, `.png` for markdown previewers, etc.
+
+    Three ways to declare sources, from simplest to most explicit:
+
+    1. Implicit directory: no `source` / no `formats`, just `figures/<id>/`
+       containing files like `<id>.pdf`, `<id>.html`, `<id>.png`. The resolver
+       scans the directory and picks the best-available artifact per target.
+
+    2. Explicit `formats` map, overrides directory auto-detection:
+         formats:
+           pdf:     figures/fig_1/fig_1.pdf
+           html:    figures/fig_1/fig_1.html
+           preview: figures/fig_1/fig_1.png
+
+    3. Legacy `source`: single path, used for all targets (still works).
+    """
     id: str
     source: Optional[str] = None
+    formats: dict[str, str] = field(default_factory=dict)  # target -> path
     width: str = "\\textwidth"
     caption_height: str = "2in"
     crop: bool = True
@@ -97,7 +117,66 @@ class FigureEntry:
 
     @property
     def is_placeholder(self) -> bool:
-        return self.source is None
+        return self.source is None and not self.formats
+
+
+# Default file-format preference per build target. First extension that exists
+# in the figure's directory (or in the `formats` map) wins.
+TARGET_PREFERENCES: dict[str, tuple[str, ...]] = {
+    'pdf':     ('pdf', 'eps', 'svg', 'png', 'jpg', 'jpeg'),
+    'html':    ('html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'pdf'),
+    'preview': ('png', 'jpg', 'jpeg', 'svg'),
+}
+
+
+def resolve_figure(entry: FigureEntry, target: str,
+                   figures_dir: Path) -> Optional[Path]:
+    """Return the best artifact path for a figure given a build target.
+
+    Resolution order:
+      1. If `entry.formats[target]` is set, use it (absolute or relative to
+         figures_dir's parent — whichever resolves on disk).
+      2. If a directory `figures_dir / <id>/` exists, pick the first file
+         matching the target's preference order whose stem equals the figure id.
+      3. If `entry.source` is set, return it (resolved against figures_dir's
+         parent). The legacy flat-path fallback.
+      4. None.
+    """
+    prefs = TARGET_PREFERENCES.get(target, TARGET_PREFERENCES['pdf'])
+    src_root = figures_dir.parent  # paths in manifest are relative to src/<ver>/
+
+    # (1) explicit per-target override
+    if target in entry.formats:
+        p = Path(entry.formats[target])
+        if not p.is_absolute():
+            p = (src_root / p).resolve()
+        if p.exists():
+            return p
+
+    # (2) directory layout: figures/<id>/<id>.<ext>
+    fig_dir = figures_dir / entry.id
+    if fig_dir.is_dir():
+        for ext in prefs:
+            candidate = fig_dir / f'{entry.id}.{ext}'
+            if candidate.exists():
+                return candidate
+        # fallback: pick any file matching id.* regardless of preference
+        for f in fig_dir.glob(f'{entry.id}.*'):
+            if f.is_file():
+                return f
+
+    # (3) legacy `source:` path
+    if entry.source:
+        p = Path(entry.source)
+        if not p.is_absolute():
+            p = (src_root / p).resolve()
+        if p.exists():
+            return p
+        # As a last resort return the unresolved path so callers can emit
+        # a placeholder or a broken link for visibility.
+        return p
+
+    return None
 
 
 @dataclass
@@ -217,9 +296,13 @@ class Manifest:
             prov = None
             if 'provenance' in spec:
                 prov = Provenance.from_dict(spec['provenance'])
+            formats = spec.get('formats') or {}
+            if not isinstance(formats, dict):
+                formats = {}
             self.figures[fig_id_str] = FigureEntry(
                 id=fig_id_str,
                 source=spec.get('source'),
+                formats={str(k): str(v) for k, v in formats.items()},
                 width=spec.get('width', '\\textwidth'),
                 caption_height=spec.get('caption_height', '2in'),
                 crop=spec.get('crop', True),
@@ -315,8 +398,10 @@ class Manifest:
                 spec: dict[str, Any] = {}
                 if entry.source:
                     spec['source'] = entry.source
-                else:
+                elif not entry.formats:
                     spec['source'] = None
+                if entry.formats:
+                    spec['formats'] = dict(entry.formats)
                 if entry.width != '\\textwidth':
                     spec['width'] = entry.width
                 if entry.caption_height != '2in':

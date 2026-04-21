@@ -122,7 +122,8 @@ def _prettify_sci_in_math(text: str) -> str:
 def _convert_inline(text: str,
                     resolve_variable: Callable[[str, Optional[str]], tuple],
                     escape_text: bool = True,
-                    resolve_citation: Optional[Callable[[str], tuple]] = None) -> str:
+                    resolve_citation: Optional[Callable[[str], tuple]] = None,
+                    resolve_ref: Optional[Callable[[str], tuple]] = None) -> str:
     """Convert a single line of markdown prose to HTML.
 
     Escapes LaTeX/HTML special characters, preserves math and citations,
@@ -188,7 +189,12 @@ def _convert_inline(text: str,
     def _ref(m: re.Match) -> str:
         key = f'\x00R{counter[0]}\x00'
         label = m.group(1)
-        store[key] = f'<a class="ref" href="#{_escape(label)}">{_escape(label)}</a>'
+        if resolve_ref is not None:
+            display, href = resolve_ref(label)
+        else:
+            display, href = label, f'#{label}'
+        store[key] = (f'<a class="ref" href="{_escape(href)}">'
+                      f'{_escape(display)}</a>')
         counter[0] += 1
         return key
     text = re.sub(r'\\(?:ref|eqref|pageref|autoref|nameref)\{([^{}]+)\}', _ref, text)
@@ -200,6 +206,16 @@ def _convert_inline(text: str,
         counter[0] += 1
         return key
     text = re.sub(r'\\label\{([^{}]+)\}', _label, text)
+
+    # Protect pre-existing <a id="..."></a> anchors (e.g., emitted by the
+    # latex-fence scanner for \label{} inside ```latex blocks) so the later
+    # HTML-escape step doesn't turn them into literal `&lt;a id...`.
+    def _anchor(m: re.Match) -> str:
+        key = f'\x00A{counter[0]}\x00'
+        store[key] = m.group(0)
+        counter[0] += 1
+        return key
+    text = re.sub(r'<a id="[^"]+"></a>', _anchor, text)
 
     # 4. Protect inline code (already handled specially)
     def _code(m: re.Match) -> str:
@@ -248,7 +264,7 @@ def _convert_inline(text: str,
     # (\_, \&, \%, \#, \$, \{, \}) first — they're LaTeX-only artifacts and
     # should display as the literal character in HTML.
     if escape_text:
-        parts = re.split(r'(\x00[VMCRLKT]\d+\x00)', text)
+        parts = re.split(r'(\x00[VMCRLKTA]\d+\x00)', text)
         escaped = []
         for p in parts:
             if p in var_spans or p in store:
@@ -267,11 +283,15 @@ def _convert_inline(text: str,
         alt, src, title = m.group(1), m.group(2), m.group(3)
         title_attr = f' title="{_escape(title)}"' if title else ''
         if src.lower().endswith('.html') or src.lower().endswith('.htm'):
-            # interactive/plotly figure — embed as iframe
-            return (f'<div class="figure-html">'
+            # Interactive (e.g., Plotly) figure — embed as a self-sizing
+            # iframe. The page-level JS attaches a load handler that reads
+            # the iframe's contentDocument.body.scrollHeight and removes the
+            # scrollbar, so the figure expands to its natural height.
+            return (f'<figure class="figure-html">'
                     f'<iframe src="{_escape(src)}"{title_attr} '
-                    f'class="w-full min-h-[400px] rounded-lg border" loading="lazy"></iframe>'
-                    f'<p class="caption">{_escape(alt)}</p></div>')
+                    f'class="interactive-fig" loading="lazy" '
+                    f'scrolling="no" frameborder="0"></iframe>'
+                    f'<figcaption class="caption">{_escape(alt)}</figcaption></figure>')
         if src.lower().endswith('.pdf'):
             return (f'<div class="figure-pdf">'
                     f'<embed src="{_escape(src)}" type="application/pdf" '
@@ -314,7 +334,8 @@ def _convert_inline(text: str,
 
 def _convert_table(block_lines: list[str],
                    resolve_variable: Callable[[str, Optional[str]], tuple],
-                   resolve_citation: Optional[Callable[[str], tuple]] = None) -> str:
+                   resolve_citation: Optional[Callable[[str], tuple]] = None,
+                   resolve_ref: Optional[Callable[[str], tuple]] = None) -> str:
     """Convert a markdown pipe-table to an HTML <table>."""
     if len(block_lines) < 2:
         return '\n'.join(block_lines)
@@ -333,13 +354,13 @@ def _convert_table(block_lines: list[str],
     out = ['<table class="md-table">']
     out.append('<thead><tr>')
     for h in header:
-        out.append(f'<th>{_convert_inline(h, resolve_variable, resolve_citation=resolve_citation)}</th>')
+        out.append(f'<th>{_convert_inline(h, resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</th>')
     out.append('</tr></thead>')
     out.append('<tbody>')
     for row in body_rows:
         out.append('<tr>')
         for c in row:
-            out.append(f'<td>{_convert_inline(c, resolve_variable, resolve_citation=resolve_citation)}</td>')
+            out.append(f'<td>{_convert_inline(c, resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</td>')
         out.append('</tr>')
     out.append('</tbody></table>')
     return '\n'.join(out)
@@ -347,7 +368,8 @@ def _convert_table(block_lines: list[str],
 
 def md_to_html(md_content: str,
                resolve_variable: Callable[[str, Optional[str]], tuple],
-               resolve_citation: Optional[Callable[[str], tuple]] = None) -> str:
+               resolve_citation: Optional[Callable[[str], tuple]] = None,
+               resolve_ref: Optional[Callable[[str], tuple]] = None) -> str:
     """Convert a markdown doc to an HTML fragment (not a full document).
 
     Args:
@@ -357,9 +379,19 @@ def md_to_html(md_content: str,
         resolve_citation: Callback (key) -> (number_int, href_str_or_None). If
                           provided, \\cite{key} renders as a numbered hyperlink
                           [N] pointing at #ref-key.
+        resolve_ref: Callback (key) -> (display_text, href_str). Used to turn
+                     \\ref{tab:x} into "Table 3" linked to #tab:x when the
+                     caller has a label-to-number map.
     """
-    # Drop ```latex fences entirely (they're LaTeX-only passthrough)
-    text = _LATEX_FENCE_RE.sub('', md_content)
+    # Drop ```latex fences but preserve any \label{} inside them as <a id>
+    # anchors so \ref{} links actually resolve to something in the HTML.
+    def _replace_latex_fence(m: re.Match) -> str:
+        content = m.group(0)
+        labels = re.findall(r'\\label\{([^{}]+)\}', content)
+        if not labels:
+            return ''
+        return ''.join(f'<a id="{_escape(lbl)}"></a>' for lbl in labels)
+    text = _LATEX_FENCE_RE.sub(_replace_latex_fence, md_content)
 
     # Preview markers: keep the content, drop the <!-- markers -->
     def _unwrap_preview(m: re.Match) -> str:
@@ -419,7 +451,7 @@ def md_to_html(md_content: str,
             label_ids = re.findall(r'<a id="([^"]+)"></a>', raw_title)
             clean_title = re.sub(r'<a id="[^"]+"></a>', '', raw_title).strip()
             slug = label_ids[0] if label_ids else slugify(clean_title)
-            title_inline = _convert_inline(clean_title, resolve_variable, resolve_citation=resolve_citation)
+            title_inline = _convert_inline(clean_title, resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)
             extra_anchors = ''.join(
                 f'<a id="{lid}"></a>' for lid in label_ids[1:]
             )
@@ -438,7 +470,7 @@ def md_to_html(md_content: str,
             out.append('<ul>')
             while i < n and re.match(r'^\s*[-*+]\s', lines[i]):
                 item = re.sub(r'^\s*[-*+]\s+', '', lines[i])
-                out.append(f'<li>{_convert_inline(item, resolve_variable, resolve_citation=resolve_citation)}</li>')
+                out.append(f'<li>{_convert_inline(item, resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</li>')
                 i += 1
             out.append('</ul>')
             continue
@@ -448,7 +480,7 @@ def md_to_html(md_content: str,
             out.append('<ol>')
             while i < n and re.match(r'^\s*\d+\.\s', lines[i]):
                 item = re.sub(r'^\s*\d+\.\s+', '', lines[i])
-                out.append(f'<li>{_convert_inline(item, resolve_variable, resolve_citation=resolve_citation)}</li>')
+                out.append(f'<li>{_convert_inline(item, resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</li>')
                 i += 1
             out.append('</ol>')
             continue
@@ -459,7 +491,7 @@ def md_to_html(md_content: str,
             while i < n and '|' in lines[i].strip():
                 block.append(lines[i])
                 i += 1
-            out.append(_convert_table(block, resolve_variable, resolve_citation))
+            out.append(_convert_table(block, resolve_variable, resolve_citation, resolve_ref))
             continue
 
         # Blockquote
@@ -470,7 +502,8 @@ def md_to_html(md_content: str,
                 i += 1
             out.append('<blockquote>'
                        + _convert_inline(' '.join(quote_lines), resolve_variable,
-                                         resolve_citation=resolve_citation)
+                                         resolve_citation=resolve_citation,
+                                         resolve_ref=resolve_ref)
                        + '</blockquote>')
             continue
 
@@ -480,7 +513,7 @@ def md_to_html(md_content: str,
             para_lines.append(lines[i].strip())
             i += 1
         if para_lines:
-            out.append(f'<p>{_convert_inline(" ".join(para_lines), resolve_variable, resolve_citation=resolve_citation)}</p>')
+            out.append(f'<p>{_convert_inline(" ".join(para_lines), resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</p>')
             continue
         i += 1
 

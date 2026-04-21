@@ -229,17 +229,32 @@ def _first_caption(block: str) -> Optional[str]:
     return body
 
 
-def _first_image_path(block: str, figures: dict) -> Optional[str]:
+def _first_image_path(block: str, figures: dict,
+                      figures_dir: Optional[Path] = None) -> Optional[str]:
     """Return a markdown-usable path for the first image in a figure env.
 
-    Resolves {{canva:N}} / {{fig:id}} via the manifest. Falls back to the
-    raw \\includegraphics argument if present.
+    Resolves {{canva:N}} / {{fig:id}} via the manifest, preferring raster
+    formats (png/jpg) since markdown previewers can't render pdf/html.
+    Falls back to the raw \\includegraphics argument if present.
     """
+    from .manifest import resolve_figure
+
     fig_var = re.search(r'\{\{(?:canva|fig):([A-Za-z0-9_\-]+)\}\}', block)
     if fig_var:
         fig_id = fig_var.group(1)
         entry = figures.get(fig_id) or figures.get(str(fig_id))
         if entry:
+            # Prefer the preview-optimized artifact (png/jpg/svg) from the
+            # figures/<id>/ directory or an explicit formats.preview override.
+            if figures_dir is not None and hasattr(entry, 'formats'):
+                resolved = resolve_figure(entry, 'preview', figures_dir)
+                if resolved is not None and resolved.exists():
+                    # Return path relative to figures_dir's parent (src_dir) so
+                    # the caller can render a relative md path from the doc.
+                    try:
+                        return str(resolved.relative_to(figures_dir.parent))
+                    except ValueError:
+                        return str(resolved)
             source = entry.source if hasattr(entry, 'source') else entry.get('source')
             if source:
                 return source
@@ -283,7 +298,8 @@ def figure_preview(block: str, figures: dict,
                    src_dir: Optional[Path] = None,
                    doc_dir: Optional[Path] = None) -> Optional[str]:
     """Generate a markdown image for a figure environment."""
-    path = _first_image_path(block, figures)
+    figures_dir = (src_dir / 'figures') if src_dir is not None else None
+    path = _first_image_path(block, figures, figures_dir=figures_dir)
     if not path:
         # Figure with no resolvable image (e.g. placeholder) — still emit a stub
         cap = _first_caption(block) or 'Figure'

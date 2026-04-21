@@ -41,6 +41,7 @@ class VariableProcessor:
         crop_script: Optional[Path] = None,
         figures: Optional[dict] = None,
         figures_dir: Optional[Path] = None,
+        target: str = "pdf",
     ):
         self.variables: dict[str, Any] = {}
         self.placeholder = placeholder
@@ -56,6 +57,7 @@ class VariableProcessor:
         # figures: dict mapping figure_id -> FigureEntry (from manifest)
         self.figures = figures or {}
         self.figures_dir = figures_dir
+        self.target = target  # "pdf" | "html" | "preview" — drives artifact picking
 
     def load_variables(self, json_path: Path) -> int:
         """Load variables from a JSON file. Returns count of variables loaded."""
@@ -107,6 +109,20 @@ class VariableProcessor:
                 if figure_id in self.figures:
                     fig_entry = self.figures[figure_id]
                     width = getattr(fig_entry, 'width', '\\textwidth')
+                    # Use the format resolver if we have a figures_dir; falls
+                    # back to the legacy `source` attribute otherwise.
+                    resolved_path = None
+                    if self.figures_dir is not None:
+                        from .manifest import resolve_figure
+                        resolved_path = resolve_figure(
+                            fig_entry, self.target, self.figures_dir
+                        )
+                    if resolved_path is not None and resolved_path.exists():
+                        # The LaTeX \input uses a path relative to the build's
+                        # figures dir (which is flattened). Use just the basename
+                        # so build.py's copy step can match it up.
+                        rel = f"figures/{resolved_path.name}"
+                        return f"\\includegraphics[width={width}]{{{rel}}}"
                     source = getattr(fig_entry, 'source', None)
                     if source:
                         return f"\\includegraphics[width={width}]{{{source}}}"

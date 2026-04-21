@@ -28,15 +28,43 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-from .manifest import Manifest
+from .manifest import Manifest, resolve_figure
 from .preview import parse_macros
 from .variable_processor import VariableProcessor
 from .md2html import md_to_html
 from .bib import load_bib, render_entry_html, BibEntry
+from .figure_crop import copy_with_crop, pillow_available
+
+
+def _normalize_plotly_html_figures(figures_dir: Path, verbose: bool = False) -> None:
+    """Run Plotly HTML files through plotly_html.normalize — multi-plot files
+    become tabbed layouts, all files get the resize-reporter. Idempotent."""
+    from .plotly_html import normalize as normalize_plotly
+
+    if not figures_dir.exists():
+        return
+    for f in figures_dir.glob('*.html'):
+        try:
+            text = f.read_text(encoding='utf-8')
+        except Exception:
+            continue
+        new_text, n_tabs = normalize_plotly(text)
+        if new_text != text:
+            f.write_text(new_text, encoding='utf-8')
+        if verbose:
+            if n_tabs >= 2:
+                print(f'    [tabs] {f.name}: {n_tabs} plots → tabbed layout')
+            else:
+                print(f'    [passthrough] {f.name}: single plot')
 
 
 def _compute_figures_copy_plan(src_dir: Path, html_dir: Path) -> list[tuple[Path, Path]]:
-    """Pairs of (source_fig, dest_fig) to copy alongside the HTML output."""
+    """Pairs of (source_fig, dest_fig) to copy alongside the HTML output.
+
+    Flattens subdirectories so `figures/suppfig1/suppfig1.pdf` ends up at
+    `html/figures/suppfig1.pdf` — this matches how image paths in the rendered
+    HTML reference figures (basename only, since they're resolved at build time
+    to a single artifact per target)."""
     src_figs = src_dir / 'figures'
     if not src_figs.exists():
         return []
@@ -44,8 +72,7 @@ def _compute_figures_copy_plan(src_dir: Path, html_dir: Path) -> list[tuple[Path
     pairs = []
     for f in src_figs.rglob('*'):
         if f.is_file():
-            rel = f.relative_to(src_figs)
-            pairs.append((f, dest_figs / rel))
+            pairs.append((f, dest_figs / f.name))
     return pairs
 
 
@@ -142,6 +169,56 @@ class CitationCollector:
             + '\n'.join(items)
             + '</ol></section>'
         )
+
+
+_LABEL_RE = __import__('re').compile(r'\\label\{([^{}]+)\}')
+
+# Prefix → display name for cross-references. "fig:xyz" → "Figure 3".
+_LABEL_KIND_NAMES = {
+    'fig': 'Figure',
+    'tab': 'Table',
+    'eq': 'Eq.',
+    'sec': 'Section',
+    'eqn': 'Eq.',
+    'app': 'Appendix',
+    'alg': 'Algorithm',
+}
+
+
+def _collect_labels(manifest, src_dir: Path) -> dict[str, tuple[str, int]]:
+    """Walk every section doc, find \\label{key}s in document order, and
+    assign numbers by kind (fig/tab/eq/...). Returns {key: (kind_name, number)}.
+
+    Used to render \\ref{key} as "Figure 3" / "Table 2" with working #anchors."""
+    counters: dict[str, int] = {}
+    labels: dict[str, tuple[str, int]] = {}
+    pseudo = {'_bibliography', '_toc'}
+    for section_ref in manifest.sections:
+        if section_ref in pseudo:
+            continue
+        doc_path = src_dir / section_ref
+        if not doc_path.exists():
+            continue
+        content = doc_path.read_text(encoding='utf-8')
+        for m in _LABEL_RE.finditer(content):
+            key = m.group(1)
+            if key in labels:
+                continue  # duplicate label, keep first
+            prefix = key.split(':', 1)[0] if ':' in key else 'sec'
+            kind = _LABEL_KIND_NAMES.get(prefix, 'Section')
+            counters[prefix] = counters.get(prefix, 0) + 1
+            labels[key] = (kind, counters[prefix])
+    return labels
+
+
+def _make_resolve_ref(labels: dict[str, tuple[str, int]]):
+    """Build a (key) -> (display, href) callable for md_to_html's resolve_ref."""
+    def _resolve(key: str) -> tuple:
+        if key in labels:
+            kind, num = labels[key]
+            return f'{kind} {num}', f'#{key}'
+        return key, f'#{key}'
+    return _resolve
 
 
 def _render_section_html(body: str, title: Optional[str] = None) -> str:
@@ -310,6 +387,95 @@ INDEX_TEMPLATE = """<!doctype html>
     text-align: center; padding: 0 1rem; line-height: 1.5;
   }}
   .figure-html, .figure-pdf {{ margin: 3rem 0; }}
+  /* Interactive (Plotly / HTML) figures. The embedded figure uses
+     postMessage to tell the parent its natural height; parent resizes the
+     iframe to match. 420px is a reasonable fallback while the message is
+     in flight. */
+  iframe.interactive-fig {{
+    display: block; width: 100%;
+    height: 420px;
+    border: 1px solid hsl(var(--border));
+    border-radius: .5rem;
+    background: white;
+    overflow: hidden;
+    transition: height .2s ease-out;
+  }}
+
+  /* Expand-to-modal button — injected onto every figure at runtime. */
+  figure.figure-img, figure.figure-html, .figure-pdf {{ position: relative; }}
+  .fig-expand-btn {{
+    position: absolute; top: .5rem; right: .5rem; z-index: 5;
+    width: 2rem; height: 2rem;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid hsl(var(--border));
+    background: rgba(255, 255, 255, .9);
+    border-radius: .375rem;
+    cursor: pointer;
+    color: #475569;
+    opacity: 0; transition: opacity .15s, color .15s, background .15s;
+    backdrop-filter: blur(4px);
+  }}
+  figure.figure-img:hover .fig-expand-btn,
+  figure.figure-html:hover .fig-expand-btn,
+  .figure-pdf:hover .fig-expand-btn {{ opacity: 1; }}
+  .fig-expand-btn:hover {{ color: hsl(var(--accent)); background: white; }}
+  .fig-expand-btn svg {{ width: 1rem; height: 1rem; }}
+
+  /* Modal overlay + dialog */
+  .fig-modal-backdrop {{
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(15, 23, 42, .6);
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 2rem;
+    opacity: 0; transition: opacity .2s ease;
+  }}
+  .fig-modal-backdrop.visible {{ display: flex; opacity: 1; }}
+  .fig-modal {{
+    background: white;
+    border-radius: .75rem;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,.5);
+    width: min(95vw, 1600px);
+    height: min(92vh, 1100px);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    transform: scale(.97); transition: transform .2s ease;
+  }}
+  .fig-modal-backdrop.visible .fig-modal {{ transform: none; }}
+  .fig-modal-head {{
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .75rem 1rem;
+    border-bottom: 1px solid hsl(var(--border));
+    flex: 0 0 auto;
+  }}
+  .fig-modal-caption {{
+    font-size: .85rem; color: hsl(var(--muted-foreground));
+    margin: 0; padding-right: 1rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }}
+  .fig-modal-close {{
+    background: none; border: none; cursor: pointer;
+    width: 2rem; height: 2rem;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: .375rem; color: #475569; flex: 0 0 auto;
+  }}
+  .fig-modal-close:hover {{ background: hsl(var(--muted)); color: #0f172a; }}
+  .fig-modal-body {{
+    flex: 1 1 auto; min-height: 0;
+    padding: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    overflow: auto;
+    background: #fafafa;
+  }}
+  .fig-modal-body img {{
+    max-width: 100%; max-height: 100%; object-fit: contain;
+    border-radius: .25rem;
+  }}
+  .fig-modal-body iframe, .fig-modal-body embed {{
+    width: 100%; height: 100%;
+    border: 1px solid hsl(var(--border)); border-radius: .25rem;
+    background: white;
+  }}
   p + figure, figure + p {{ margin-top: 2.5rem; }}
   p + .figure-html, p + .figure-pdf {{ margin-top: 2.5rem; }}
   .figure-html + p, .figure-pdf + p {{ margin-top: 2.5rem; }}
@@ -478,6 +644,17 @@ INDEX_TEMPLATE = """<!doctype html>
     </aside>
   </div>
 
+  <!-- Figure expand-to-modal dialog (shared by all figures) -->
+  <div id="fig-modal-backdrop" class="fig-modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="fig-modal" role="document">
+      <div class="fig-modal-head">
+        <p class="fig-modal-caption" id="fig-modal-caption"></p>
+        <button type="button" class="fig-modal-close" id="fig-modal-close" aria-label="Close figure">&times;</button>
+      </div>
+      <div class="fig-modal-body" id="fig-modal-body"></div>
+    </div>
+  </div>
+
   <script>
     // KaTeX auto-render with our template's \\newcommand macros wired in
     const katexMacros = {katex_macros_json};
@@ -597,6 +774,111 @@ INDEX_TEMPLATE = """<!doctype html>
       if (e.key === "Escape") closeProvenance();
     }});
 
+    // Auto-resize interactive (Plotly / HTML) figures. Each embedded .html
+    // figure has a tiny script injected at build time that posts its
+    // content's scrollHeight back to us via postMessage. Works around
+    // Chrome's file:// same-origin restrictions on contentDocument reads.
+    window.addEventListener("message", (e) => {{
+      if (!e || !e.data || typeof e.data.latexBuilderFigureHeight !== "number") return;
+      const h = e.data.latexBuilderFigureHeight;
+      // Cap at 90vh so a rogue figure can't take over the viewport.
+      const cap = Math.round(window.innerHeight * 0.9);
+      const clamped = Math.min(h, cap);
+      document.querySelectorAll("iframe.interactive-fig").forEach(iframe => {{
+        if (iframe.contentWindow === e.source) {{
+          iframe.style.height = clamped + "px";
+        }}
+      }});
+    }});
+
+    // Expand-to-modal for every figure. Adds a corner button on each
+    // .figure-img / .figure-html / .figure-pdf; clicking opens a large modal
+    // that mirrors the figure's content (img/iframe/embed) at viewport scale.
+    document.addEventListener("DOMContentLoaded", () => {{
+      const expandIcon = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M16 9V4h-5M4 11v5h5M16 11v5h-5"/></svg>`;
+      const figures = document.querySelectorAll(".figure-img, .figure-html, .figure-pdf");
+      figures.forEach((fig) => {{
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "fig-expand-btn";
+        btn.setAttribute("aria-label", "Expand figure");
+        btn.title = "Expand";
+        btn.innerHTML = expandIcon;
+        btn.addEventListener("click", (e) => {{
+          e.preventDefault();
+          openFigureModal(fig);
+        }});
+        fig.appendChild(btn);
+      }});
+
+      const backdrop = document.getElementById("fig-modal-backdrop");
+      const body = document.getElementById("fig-modal-body");
+      const caption = document.getElementById("fig-modal-caption");
+      const closeBtn = document.getElementById("fig-modal-close");
+
+      function openFigureModal(fig) {{
+        body.innerHTML = "";
+        // Prefer iframe (interactive), then img, then embed (pdf)
+        const iframe = fig.querySelector("iframe");
+        const img = fig.querySelector("img");
+        const embed = fig.querySelector("embed");
+        let node;
+        if (iframe) {{
+          node = document.createElement("iframe");
+          node.src = iframe.getAttribute("src");
+          node.setAttribute("frameborder", "0");
+          node.setAttribute("scrolling", "no");
+        }} else if (img) {{
+          node = document.createElement("img");
+          node.src = img.getAttribute("src");
+          node.alt = img.getAttribute("alt") || "";
+        }} else if (embed) {{
+          node = document.createElement("embed");
+          node.src = embed.getAttribute("src");
+          node.type = embed.getAttribute("type") || "application/pdf";
+        }} else {{
+          return;
+        }}
+        body.appendChild(node);
+        const captionEl = fig.querySelector("figcaption, .caption");
+        caption.textContent = captionEl ? captionEl.textContent.trim() : "";
+        backdrop.classList.add("visible");
+        backdrop.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      }}
+
+      function closeFigureModal() {{
+        backdrop.classList.remove("visible");
+        backdrop.setAttribute("aria-hidden", "true");
+        body.innerHTML = "";
+        document.body.style.overflow = "";
+      }}
+
+      closeBtn.addEventListener("click", closeFigureModal);
+      backdrop.addEventListener("click", (e) => {{
+        if (e.target === backdrop) closeFigureModal();
+      }});
+      document.addEventListener("keydown", (e) => {{
+        if (e.key === "Escape" && backdrop.classList.contains("visible")) {{
+          closeFigureModal();
+        }}
+      }});
+
+      // Size-feedback for iframes inside the modal: reuse the same
+      // postMessage protocol so the interactive figure matches the modal's
+      // natural space.
+      window.addEventListener("message", (e) => {{
+        if (!e || !e.data || typeof e.data.latexBuilderFigureHeight !== "number") return;
+        const modalIframe = body.querySelector("iframe");
+        if (modalIframe && modalIframe.contentWindow === e.source) {{
+          // In the modal we've already given the iframe 100% of the body,
+          // so just let the iframe keep its size — no-op here, but the
+          // handler above (outside the modal) will also fire and resize the
+          // original figure as needed.
+        }}
+      }});
+    }});
+
     // Scroll-spy: highlight the TOC entry matching the heading currently in view.
     document.addEventListener("DOMContentLoaded", () => {{
       const tocLinks = Array.from(document.querySelectorAll(".toc a[href^='#']"));
@@ -648,6 +930,11 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     if verbose:
         print(f'  Loaded {len(bib_entries)} bibliography entries')
 
+    labels = _collect_labels(manifest, src_dir)
+    resolve_ref = _make_resolve_ref(labels)
+    if verbose:
+        print(f'  Indexed {len(labels)} label(s) for cross-references')
+
     # Template macros for KaTeX (mirrors preview's expansion)
     macros: dict[str, str] = {}
     template_name = manifest.get_template_name() if manifest else 'article'
@@ -659,10 +946,40 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     # KaTeX expects macros keyed with the leading backslash
     katex_macros = {f'\\{k}': v for k, v in macros.items()}
 
-    # Render each section. Rewrite `../figures/` → `figures/` so paths
-    # resolve from index.html (figures get copied into the same html/ dir).
+    # Build a stem→FigureEntry lookup so we can upgrade image paths to the
+    # HTML-preferred artifact (e.g., pigean-figure-3.png → pigean-figure-3.html
+    # as an <iframe>). We need to match by both the figure id AND by the file
+    # stem of its source/formats paths, because preview blocks bake paths in.
     import re as _re
-    _REWRITE_FIG_PATH = _re.compile(r'\.\./figures/')
+    figures_dir = src_dir / 'figures'
+    fig_by_stem: dict[str, object] = {}
+    for fig_id, entry in manifest.figures.items():
+        fig_by_stem[fig_id] = entry
+        if entry.source:
+            fig_by_stem[Path(entry.source).stem] = entry
+        for fmt_path in entry.formats.values():
+            fig_by_stem[Path(fmt_path).stem] = entry
+
+    _IMAGE_RE = _re.compile(r'!\[([^\]]*)\]\(([^)\s]+)\)')
+
+    def _upgrade_figure_path(md: str) -> str:
+        """Swap image paths in markdown to each figure's html-preferred artifact.
+        Also rewrite ../figures/ to figures/ (output dir layout)."""
+        def _sub(m: _re.Match) -> str:
+            alt = m.group(1)
+            path = m.group(2)
+            # Extract filename stem, look up in manifest
+            p = Path(path)
+            stem = p.stem
+            if stem in fig_by_stem:
+                resolved = resolve_figure(fig_by_stem[stem], 'html', figures_dir)
+                if resolved is not None and resolved.exists():
+                    # Use basename only — figures get copied flat into html/figures/
+                    # and nested subdir paths get flattened by _flatten_copy below.
+                    return f'![{alt}](figures/{resolved.name})'
+            # No manifest entry: just do the ../figures/ → figures/ rewrite
+            return f'![{alt}]({path.replace("../figures/", "figures/")})'
+        return _IMAGE_RE.sub(_sub, md)
 
     section_htmls: list[str] = []
     pseudo = {'_bibliography', '_toc'}
@@ -675,8 +992,8 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
             print(f'  WARNING: section not found: {section_ref}')
             continue
         md_text = doc_path.read_text(encoding='utf-8')
-        md_text = _REWRITE_FIG_PATH.sub('figures/', md_text)
-        body = md_to_html(md_text, resolve, resolve_citation=citations.resolve)
+        md_text = _upgrade_figure_path(md_text)
+        body = md_to_html(md_text, resolve, resolve_citation=citations.resolve, resolve_ref=resolve_ref)
         section_htmls.append(_render_section_html(body))
         if verbose:
             print(f'    Rendered: {section_ref}')
@@ -716,19 +1033,39 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     index_path = html_dir / 'index.html'
     index_path.write_text(html, encoding='utf-8')
 
-    # Copy figures so <img>/<iframe> paths resolve. Docs link ../figures/foo.png
-    # relative to the doc, but in the HTML output the index.html sits at html/
-    # and figures live at html/figures/. We rewrite the href layout accordingly
-    # at the markdown level (see note below); for now we copy everything.
-    n_copied = 0
+    # Copy figures so <img>/<iframe> paths resolve. The copy plan flattens
+    # subdirectories (figures/foo/foo.png → figures/foo.png) and crop_with_copy
+    # trims vertical whitespace from raster images unless the manifest opts out.
+    crop_by_stem: dict[str, bool] = {}
+    for fig_id, entry in manifest.figures.items():
+        for p in [entry.source] + list(entry.formats.values()):
+            if p:
+                crop_by_stem[Path(p).stem] = entry.crop
+
+    n_copied = n_cropped = 0
     for src_fig, dest_fig in _compute_figures_copy_plan(src_dir, html_dir):
-        dest_fig.parent.mkdir(parents=True, exist_ok=True)
-        if not dest_fig.exists() or src_fig.stat().st_mtime > dest_fig.stat().st_mtime:
-            shutil.copy2(src_fig, dest_fig)
+        crop = crop_by_stem.get(src_fig.stem, True)
+        mode, info = copy_with_crop(src_fig, dest_fig, crop=crop)
+        if mode == 'cropped':
+            n_copied += 1
+            n_cropped += 1
+            if verbose and info:
+                print(f'    [cropped] {src_fig.name}: {info}')
+        elif mode == 'copied':
             n_copied += 1
 
+    # Post-process interactive (.html) figures: normalize Plotly exports
+    # (multi-plot → tabbed layout) and inject the parent-side resize reporter.
+    # See src/latex_builder/plotly_html.py and docs/html-multi-plot-standard.md.
+    _normalize_plotly_html_figures(html_dir / 'figures', verbose=verbose)
+
     print(f'  HTML written: {index_path}')
-    print(f'  Figures copied: {n_copied}')
+    msg = f'  Figures copied: {n_copied}'
+    if pillow_available():
+        msg += f' ({n_cropped} cropped)'
+    else:
+        msg += ' (Pillow not installed — cropping skipped)'
+    print(msg)
 
     if open_browser:
         import webbrowser

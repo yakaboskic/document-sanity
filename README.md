@@ -18,6 +18,18 @@ render both to PDF and to markdown-native previews for GitHub/VSCode/Obsidian.
 | `latex-builder init <name>` | Fresh project scaffold | Start a new manuscript project from scratch. |
 | `latex-builder convert file.md/.tex` | The other format | One-off md↔tex conversion (useful for scripting). |
 
+## Documentation
+
+Opinionated conventions are documented in detail under [`docs/`](./docs):
+
+- [Figures](./docs/figures.md) — subdirectory layout, target-specific artifact resolution, whitespace cropping.
+- [References & labels](./docs/references-and-labels.md) — `fig:` / `tab:` / `eq:` prefix convention drives auto-numbering.
+- [Preview blocks](./docs/preview-blocks.md) — hash-tagged markdown approximations of ```latex blocks for GitHub/VSCode.
+- [Variables & provenance](./docs/variables-and-provenance.md) — `{{VAR:fmt}}` syntax + provenance metadata that powers the HTML viewer's side panel.
+- [HTML viewer](./docs/html-viewer.md) — layout, TOC, KaTeX, figure modal, scroll-spy.
+- [HTML multi-plot standard](./docs/html-multi-plot-standard.md) — Plotly normalization and tabbed layouts.
+- [Bibliography](./docs/bibliography.md) — `.bib` parsing, citation numbering, entry rendering.
+
 ## Use it in your paper project (recommended)
 
 Create a separate repo for each paper and declare `latex-builder` as a
