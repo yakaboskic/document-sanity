@@ -124,16 +124,68 @@ def _convert_inline(text: str, escape: bool = True) -> str:
     text = re.sub(r'(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)', protect_math, text)
     # Display math $$...$$
     text = re.sub(r'\$\$.+?\$\$', protect_math, text, flags=re.DOTALL)
+    # Display math \[ ... \]
+    text = re.sub(r'\\\[.+?\\\]', protect_math, text, flags=re.DOTALL)
+    # Inline math \( ... \)
+    text = re.sub(r'\\\(.+?\\\)', protect_math, text, flags=re.DOTALL)
+
+    # Protect LaTeX commands whose arguments contain identifiers with underscores
+    # (\cite, \ref, \label, \eqref, \pageref, \autoref, \nameref, \input, \includegraphics)
+    cmd_placeholders = {}
+
+    def protect_cmd(m):
+        key = f'\x00CMD{counter[0]}\x00'
+        cmd_placeholders[key] = m.group(0)
+        counter[0] += 1
+        return key
+
+    cmd_pattern = r'\\(?:cite[a-z]*|ref|eqref|pageref|autoref|nameref|label|input|includegraphics(?:\[[^\]]*\])?)\{[^}]*\}'
+    text = re.sub(cmd_pattern, protect_cmd, text)
+    # \href{url}{text}: protect just the url arg, text arg goes through normal processing
+    text = re.sub(r'\\href\{[^}]*\}', protect_cmd, text)
+
+    # Inline code `...` -> \texttt{...}, converting inside the protection so that
+    # the special chars inside code don't get mangled by subsequent escaping.
+    # Match single backtick pairs only (not LaTeX-style ``quotes'').
+    # Preserve already-escaped sequences (\_, \{, \&, etc.) and only escape raw chars.
+    def protect_code(m):
+        key = f'\x00CMD{counter[0]}\x00'
+        inner = m.group(1)
+        # Escape only unescaped special chars (negative lookbehind for \)
+        inner = re.sub(r'(?<!\\)_', r'\\_', inner)
+        inner = re.sub(r'(?<!\\)&', r'\\&', inner)
+        inner = re.sub(r'(?<!\\)#', r'\\#', inner)
+        inner = re.sub(r'(?<!\\)%', r'\\%', inner)
+        inner = re.sub(r'(?<!\\)\$', r'\\$', inner)
+        cmd_placeholders[key] = '\\texttt{' + inner + '}'
+        counter[0] += 1
+        return key
+    text = re.sub(r'(?<!`)`([^`]+?)`(?!`)', protect_code, text)
 
     # Escape LaTeX if needed (only for non-protected text)
     if escape:
-        parts = re.split(r'(\x00(?:VAR|MATH)\d+\x00)', text)
+        parts = re.split(r'(\x00(?:VAR|MATH|CMD)\d+\x00)', text)
         escaped = []
         for part in parts:
-            if part in placeholders or part in math_placeholders:
+            if part in placeholders or part in math_placeholders or part in cmd_placeholders:
                 escaped.append(part)
             else:
                 escaped.append(_escape_latex(part))
+        text = ''.join(escaped)
+    else:
+        # In no-escape mode, still escape chars that are unsafe in running LaTeX
+        # but have no special meaning in markdown: _, &, #
+        parts = re.split(r'(\x00(?:VAR|MATH|CMD)\d+\x00)', text)
+        escaped = []
+        for part in parts:
+            if part in placeholders or part in math_placeholders or part in cmd_placeholders:
+                escaped.append(part)
+            else:
+                # Escape unescaped _, &, # (leave \_ \& \# as-is)
+                s = re.sub(r'(?<!\\)_', r'\\_', part)
+                s = re.sub(r'(?<!\\)&', r'\\&', s)
+                s = re.sub(r'(?<!\\)#', r'\\#', s)
+                escaped.append(s)
         text = ''.join(escaped)
 
     # Images: ![alt](path) -> \includegraphics{path}
@@ -159,17 +211,13 @@ def _convert_inline(text: str, escape: bool = True) -> str:
     # Italic: *text* -> \textit{text}
     text = re.sub(r'\*(.+?)\*', r'\\textit{\1}', text)
 
-    # Inline code: `text` -> \texttt{text} (escape underscores inside for safety)
-    def _texttt_escape(m):
-        inner = m.group(1).replace('_', '\\_')
-        return '\\texttt{' + inner + '}'
-    text = re.sub(r'`([^`]+)`', _texttt_escape, text)
-
     # Restore protected content (iterate to handle nesting)
     for _pass in range(3):
         for key, val in placeholders.items():
             text = text.replace(key, val)
         for key, val in math_placeholders.items():
+            text = text.replace(key, val)
+        for key, val in cmd_placeholders.items():
             text = text.replace(key, val)
 
     return text
@@ -212,6 +260,12 @@ def _convert_table(lines: list[str]) -> str:
     return '\n'.join(out)
 
 
+_PREVIEW_BLOCK_RE = re.compile(
+    r'<!--\s*latex-builder:preview:begin[^>]*-->.*?<!--\s*latex-builder:preview:end\s*-->\s*',
+    re.DOTALL,
+)
+
+
 def md_to_latex(
     md_content: str,
     escape_text: bool = True,
@@ -227,6 +281,10 @@ def md_to_latex(
         not a complete document. The caller wraps it in a document environment.
     """
     meta, body = parse_frontmatter(md_content)
+
+    # Strip auto-generated preview blocks so they don't round-trip into LaTeX.
+    # The ```latex block above each preview remains the source of truth.
+    body = _PREVIEW_BLOCK_RE.sub('', body)
 
     lines = body.split('\n')
     output = []
@@ -251,9 +309,15 @@ def md_to_latex(
                 output.append(converted.rstrip())
                 i += 1
                 continue
-            # Otherwise, inline comment was converted, continue with the line
-            line = converted
+            # Otherwise, strip the inline comment from the line entirely
+            # (LaTeX % comments would eat the rest of the line including content after them)
+            line = _re.sub(r'\s*<!--\s*.*?\s*-->\s*', ' ', line).rstrip()
+            lines[i] = line
             stripped = line.strip()
+            if not stripped:
+                output.append('')
+                i += 1
+                continue
 
         # LaTeX pass-through block: ```latex ... ```
         if stripped.startswith('```latex'):

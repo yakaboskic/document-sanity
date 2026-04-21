@@ -350,43 +350,56 @@ class ManuscriptBuilder:
         print(f"    Copied {count} supporting files")
 
     def compile_to_pdf(self) -> bool:
-        """Compile the assembled LaTeX to PDF."""
+        """Compile the assembled LaTeX to PDF.
+
+        Runs the compiler in the latex dir so that pdflatex, bibtex, and the
+        bib/bst/cls files all live in the same working directory. This avoids
+        bibtex's openout_any=p restriction on writing to absolute paths.
+        The final PDF is moved into the pdf/ dir.
+        """
         print(f"\n  Compiling to PDF...")
         self.out_pdf_dir.mkdir(parents=True, exist_ok=True)
 
+        main_name = "main"
+        main_tex = f"{main_name}.tex"
+
         if self.compiler == "latexmk":
-            cmd = ['latexmk', '-pdf', '-interaction=nonstopmode',
-                   f'-output-directory={self.out_pdf_dir}',
-                   str(self.out_main_file)]
+            cmd = ['latexmk', '-pdf', '-interaction=nonstopmode', main_tex]
             subprocess.run(cmd, capture_output=True, text=True,
                           cwd=self.out_latex_dir)
         else:
-            cmd_base = [self.compiler, '-interaction=nonstopmode',
-                       f'-output-directory={self.out_pdf_dir}']
-            main_tex = str(self.out_main_file)
+            cmd_base = [self.compiler, '-interaction=nonstopmode']
 
-            # Triple pass + bibtex
+            # Pass 1: produces .aux with \citation entries
             print(f"    Pass 1/3: {self.compiler}...")
             subprocess.run(cmd_base + [main_tex], capture_output=True,
                           text=True, cwd=self.out_latex_dir)
 
-            # BibTeX
+            # BibTeX: reads .aux, produces .bbl
             bib_files = list(self.out_latex_dir.glob("*.bib"))
             if bib_files:
                 print(f"    BibTeX...")
-                aux_file = self.out_pdf_dir / "main"
-                subprocess.run(['bibtex', str(aux_file)],
+                result = subprocess.run(['bibtex', main_name],
                              capture_output=True, text=True,
                              cwd=self.out_latex_dir)
+                if result.returncode != 0 and self.verbose:
+                    print(f"    BibTeX stderr: {result.stderr}")
+                    print(f"    BibTeX stdout: {result.stdout[-500:]}")
 
             for i in [2, 3]:
                 print(f"    Pass {i}/3: {self.compiler}...")
                 subprocess.run(cmd_base + [main_tex], capture_output=True,
                              text=True, cwd=self.out_latex_dir)
 
-        pdf_path = self.out_pdf_dir / "main.pdf"
-        if pdf_path.exists():
-            print(f"    PDF generated: {pdf_path}")
+        # Move the generated PDF and log artifacts into out_pdf_dir
+        built_pdf = self.out_latex_dir / f"{main_name}.pdf"
+        if built_pdf.exists():
+            shutil.copy2(built_pdf, self.out_pdf_dir / f"{main_name}.pdf")
+            for ext in ['.log', '.aux', '.out', '.toc', '.bbl', '.blg']:
+                f = self.out_latex_dir / f"{main_name}{ext}"
+                if f.exists():
+                    shutil.copy2(f, self.out_pdf_dir / f.name)
+            print(f"    PDF generated: {self.out_pdf_dir / f'{main_name}.pdf'}")
             return True
         else:
             print(f"    PDF generation failed")

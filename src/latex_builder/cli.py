@@ -228,6 +228,53 @@ def cmd_import(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_html(args: argparse.Namespace) -> int:
+    """Emit a single-file interactive HTML viewer."""
+    from .html_builder import build_html
+    from .build import find_latest_version
+
+    root_dir = Path(args.root).resolve()
+    version = args.version
+    if version is None:
+        try:
+            version = find_latest_version(root_dir)
+            print(f'  Auto-detected version: {version}')
+        except ValueError as e:
+            print(f'  Error: {e}', file=sys.stderr)
+            return 1
+    ok = build_html(
+        root_dir=root_dir,
+        version=version,
+        open_browser=args.open,
+        verbose=args.verbose,
+    )
+    return 0 if ok else 1
+
+
+def cmd_preview(args: argparse.Namespace) -> int:
+    """Generate/check markdown-preview blocks next to LaTeX pass-through blocks."""
+    from .preview import run
+    from .build import find_latest_version
+
+    root_dir = Path(args.root).resolve()
+    version = args.version
+    if version is None:
+        try:
+            version = find_latest_version(root_dir)
+            print(f'  Auto-detected version: {version}')
+        except ValueError as e:
+            print(f'  Error: {e}', file=sys.stderr)
+            return 1
+
+    return run(
+        root_dir=root_dir,
+        version=version,
+        check=args.check,
+        verbose=args.verbose,
+        expand_macros=not args.no_expand_macros,
+    )
+
+
 def cmd_convert(args: argparse.Namespace) -> int:
     """Convert a single file."""
     input_path = Path(args.input)
@@ -311,6 +358,32 @@ def main() -> None:
     imp_p.add_argument('--strategy', '-s', default='both', choices=['date', 'fun', 'both'],
                       help='Version naming strategy for import')
 
+    # --- html ---
+    html_p = subparsers.add_parser(
+        'html',
+        help='Generate an interactive static HTML viewer for the paper '
+             '(variables with provenance popovers, KaTeX math, TOC sidebar)'
+    )
+    html_p.add_argument('--version', '-V', help='Version to render (default: auto-detect latest)')
+    html_p.add_argument('--root', '-r', default='.', help='Project root directory')
+    html_p.add_argument('--open', action='store_true', help='Open the generated page in a browser')
+    html_p.add_argument('--verbose', '-v', action='store_true', help='Per-section output')
+
+    # --- preview ---
+    prev_p = subparsers.add_parser(
+        'preview',
+        help='Generate markdown-preview blocks next to ```latex blocks '
+             '(figures/equations/tables) so GitHub and other md viewers render them'
+    )
+    prev_p.add_argument('--version', '-V', help='Version to preview (default: auto-detect latest)')
+    prev_p.add_argument('--root', '-r', default='.', help='Project root directory')
+    prev_p.add_argument('--check', action='store_true',
+                        help='Report missing/stale preview blocks without writing (CI-friendly)')
+    prev_p.add_argument('--verbose', '-v', action='store_true', help='Per-file output')
+    prev_p.add_argument('--no-expand-macros', action='store_true',
+                        help='Skip expanding \\newcommand macros from the template '
+                             '(leaves \\prob etc. unresolved in md math)')
+
     # --- convert ---
     conv_p = subparsers.add_parser("convert", help="Convert a single file (md<->tex)")
     conv_p.add_argument('input', help='Input file')
@@ -332,6 +405,8 @@ def main() -> None:
         'build': cmd_build,
         'new-version': cmd_new_version,
         'import': cmd_import,
+        'preview': cmd_preview,
+        'html': cmd_html,
         'convert': cmd_convert,
     }
 

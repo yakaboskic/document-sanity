@@ -25,13 +25,15 @@ from typing import Optional
 
 # LaTeX environments that should be preserved as raw LaTeX blocks
 PASSTHROUGH_ENVS = {
-    'figure', 'table', 'equation', 'equation*', 'align', 'align*',
+    'figure', 'figure*', 'table', 'table*',
+    'equation', 'equation*', 'align', 'align*',
+    'eqnarray', 'eqnarray*',
     'gather', 'gather*', 'multline', 'multline*', 'split',
     'tikzpicture', 'algorithm', 'algorithmic', 'lstlisting',
-    'tabular', 'longtable', 'tablenotes', 'subcaption',
+    'tabular', 'tabular*', 'longtable', 'tablenotes', 'subcaption',
     'appendices', 'subequations', 'cases', 'pmatrix', 'bmatrix',
     'theorem', 'lemma', 'proof', 'definition', 'proposition',
-    'example', 'remark', 'quote',
+    'example', 'remark', 'quote', 'center',
 }
 
 
@@ -91,29 +93,58 @@ def latex_to_md(content: str, preserve_comments: bool = False) -> str:
                 output.append('')
                 continue
 
-        # Headings
-        heading_match = re.match(r'^\s*\\(section|subsection|subsubsection|paragraph|subparagraph)\*?\{([^}]+)\}(.*)$', stripped)
-        if heading_match:
-            level_map = {
-                'section': '#',
-                'subsection': '##',
-                'subsubsection': '###',
-                'paragraph': '####',
-                'subparagraph': '#####',
-            }
-            level = level_map[heading_match.group(1)]
-            title = _convert_inline_to_md(heading_match.group(2))
-            # Handle optional \label{} on same line
-            remainder = heading_match.group(3).strip()
-            label_match = re.search(r'\\label\{([^}]+)\}', remainder)
-            label_comment = ''
-            if label_match:
-                label_comment = f' <!-- \\label{{{label_match.group(1)}}} -->'
+        # Headings (support multi-line and nested-brace arguments)
+        heading_start = re.match(r'^\s*\\(section|subsection|subsubsection|paragraph|subparagraph)\*?\{(.*)$', stripped)
+        if heading_start:
+            def _find_close(text: str) -> int:
+                """Return index of the } balancing an already-open {."""
+                depth = 1
+                k = 0
+                while k < len(text):
+                    if text[k] == '\\' and k + 1 < len(text):
+                        k += 2
+                        continue
+                    if text[k] == '{':
+                        depth += 1
+                    elif text[k] == '}':
+                        depth -= 1
+                        if depth == 0:
+                            return k
+                    k += 1
+                return -1
 
-            output.append(f'{level} {title}{label_comment}')
-            output.append('')
-            i += 1
-            continue
+            after_open = heading_start.group(2)
+            close = _find_close(after_open)
+            accumulated = after_open
+            j = i
+            if close == -1:
+                # Multi-line heading: gather lines until brace balance is reached
+                j = i + 1
+                while j < len(lines):
+                    accumulated += ' ' + lines[j].strip()
+                    close = _find_close(accumulated)
+                    if close != -1:
+                        break
+                    j += 1
+
+            if close != -1:
+                heading_text = accumulated[:close]
+                remainder = accumulated[close + 1:].strip()
+                level_map = {
+                    'section': '#', 'subsection': '##', 'subsubsection': '###',
+                    'paragraph': '####', 'subparagraph': '#####',
+                }
+                level = level_map[heading_start.group(1)]
+                title = _convert_inline_to_md(heading_text)
+                label_match = re.search(r'\\label\{([^}]+)\}', remainder)
+                label_comment = ''
+                if label_match:
+                    label_comment = f' <!-- \\label{{{label_match.group(1)}}} -->'
+
+                output.append(f'{level} {title}{label_comment}')
+                output.append('')
+                i = j + 1
+                continue
 
         # \label{} on its own line
         if re.match(r'^\s*\\label\{[^}]+\}$', stripped):
@@ -286,6 +317,12 @@ def _convert_inline_to_md(text: str) -> str:
     # Protect display math $$...$$
     text = re.sub(r'\$\$(.+?)\$\$', protect(None), text, flags=re.DOTALL)
 
+    # Protect display math \[ ... \]
+    text = re.sub(r'\\\[.+?\\\]', protect(None), text, flags=re.DOTALL)
+
+    # Protect inline math \( ... \)
+    text = re.sub(r'\\\(.+?\\\)', protect(None), text, flags=re.DOTALL)
+
     # Convert formatting
     # \textbf{...} -> **...**
     text = re.sub(r'\\textbf\{([^}]+)\}', r'**\1**', text)
@@ -308,16 +345,10 @@ def _convert_inline_to_md(text: str) -> str:
     # \footnote{...} -> preserve as-is (complex to convert)
     # Leave as is for now, they'll survive in the pass-through
 
-    # Clean up some common LaTeX-isms
+    # Clean up some common LaTeX-isms. Preserve LaTeX escape sequences
+    # (\_, \{, \}, \&, \#, \%, \$) so they survive the round-trip back to LaTeX.
     text = text.replace('~', ' ')  # non-breaking space
     text = text.replace('\\\\', '\n')  # line break
-    text = text.replace('\\%', '%')
-    text = text.replace('\\&', '&')
-    text = text.replace('\\#', '#')
-    text = text.replace('\\_', '_')
-    text = text.replace('\\$', '$')
-    text = text.replace('\\{', '{')
-    text = text.replace('\\}', '}')
     text = text.replace('\\textasciitilde{}', '~')
     text = text.replace('\\textbackslash{}', '\\')
 
