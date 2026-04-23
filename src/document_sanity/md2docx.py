@@ -190,7 +190,7 @@ def render_markdown(
                 quote_lines.append(lines[i].strip().lstrip(">").strip())
                 i += 1
             builder.note(_rich_to_text(_inline_to_rich(" ".join(quote_lines), ctx)),
-                         type_="info", label="Note: ")
+                         type_="info", label="")
             continue
 
         # Paragraph — gather until blank line / block boundary.

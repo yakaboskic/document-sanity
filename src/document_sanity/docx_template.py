@@ -85,7 +85,7 @@ class TemplateDocument:
             raise RuntimeError("template missing word/document.xml")
         doc_xml_str = doc_xml.decode("utf-8")
 
-        # Splice body: keep <w:sectPr> only.
+        # Extract the <w:body> content.
         body_match = re.search(
             r"(<w:body[^>]*>)([\s\S]*?)(</w:body>)", doc_xml_str
         )
@@ -96,14 +96,60 @@ class TemplateDocument:
             body_match.group(2),
             body_match.group(3),
         )
-        sect_pr_match = re.search(r"<w:sectPr[\s\S]*?</w:sectPr>", existing)
-        sect_pr = sect_pr_match.group(0) if sect_pr_match else ""
 
-        new_body = (
-            f"{body_open}\n{self.content.to_xml()}\n{sect_pr}\n{body_close}"
-        )
+        # Multi-section support: templates may have multiple <w:sectPr> blocks
+        # (e.g. title page, TOC, then body). We preserve all pre-sections and
+        # only replace the content of the final section.
+        sect_prs = list(re.finditer(r"<w:sectPr[\s\S]*?</w:sectPr>", existing))
+
+        if len(sect_prs) >= 2:
+            # Keep everything up to and including the second-to-last sectPr
+            # (title page + TOC sections), then inject our content before the
+            # final sectPr.
+            #
+            # Section-break sectPr elements sit inside a paragraph:
+            #   <w:p><w:pPr><w:sectPr>...</w:sectPr></w:pPr></w:p>
+            # We must include the closing </w:pPr></w:p> to keep valid XML.
+            last_sect = sect_prs[-1]
+            second_last_sect = sect_prs[-2]
+            cut_pos = second_last_sect.end()
+            # Advance past any closing </w:pPr></w:p> that wraps this sectPr.
+            tail = existing[cut_pos:]
+            close_match = re.match(r"\s*(?:</w:pPr>\s*)?(?:</w:p>)?", tail)
+            if close_match:
+                cut_pos += close_match.end()
+            prefix = existing[:cut_pos]
+            final_sect_pr = last_sect.group(0)
+            new_body = (
+                f"{body_open}\n{prefix}\n"
+                f"{self.content.to_xml()}\n"
+                f"{final_sect_pr}\n{body_close}"
+            )
+        else:
+            # Single section: original behaviour.
+            sect_pr = sect_prs[0].group(0) if sect_prs else ""
+            new_body = (
+                f"{body_open}\n{self.content.to_xml()}\n{sect_pr}\n{body_close}"
+            )
+
         new_doc_xml = doc_xml_str.replace(body_match.group(0), new_body)
+
+        # Replace [DOCUMENT TITLE] placeholder in the generated body.
+        title = self.config.title or ""
+        if title:
+            new_doc_xml = new_doc_xml.replace("[DOCUMENT TITLE]", title)
+
         members["word/document.xml"] = new_doc_xml.encode("utf-8")
+
+        # Replace [DOCUMENT TITLE] in header files too.
+        if title:
+            for name in list(members.keys()):
+                if name.startswith("word/header") and name.endswith(".xml"):
+                    hdr = members[name].decode("utf-8")
+                    if "[DOCUMENT TITLE]" in hdr:
+                        members[name] = hdr.replace(
+                            "[DOCUMENT TITLE]", title
+                        ).encode("utf-8")
 
         # Numbering for bullet + ordered lists.
         members["word/numbering.xml"] = create_numbering_xml(
@@ -135,6 +181,14 @@ class TemplateDocument:
         if not images:
             return members
 
+        # Find the highest existing image number in the template's media/
+        # so we don't overwrite template images (logos, watermarks, etc.).
+        max_existing = 0
+        for name in members:
+            m = re.match(r"word/media/image(\d+)\.", name)
+            if m:
+                max_existing = max(max_existing, int(m.group(1)))
+
         rels_name = "word/_rels/document.xml.rels"
         rels = members.get(rels_name, b"").decode("utf-8") or (
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
@@ -142,20 +196,34 @@ class TemplateDocument:
             "</Relationships>"
         )
 
+        # Also update the document XML so inline drawings use the new names.
+        doc_key = "word/document.xml"
+        doc_xml = members[doc_key].decode("utf-8") if doc_key in members else ""
+
         for img in images:
-            # Add the image file itself.
-            media_path = f"word/media/{img.media_name}"
+            # Offset the image number to avoid collisions.
+            new_num = max_existing + img.pic_id
+            old_media = img.media_name
+            new_media = f"image{new_num}{Path(old_media).suffix}"
+
+            media_path = f"word/media/{new_media}"
             members[media_path] = Path(img.source_path).read_bytes()
 
-            # Add a relationship — target is relative to word/.
+            # Rewrite references in doc XML from old name to new name.
+            if old_media != new_media:
+                doc_xml = doc_xml.replace(old_media, new_media)
+
+            # Add a relationship.
             if f'Id="{img.rel_id}"' not in rels:
                 rel_frag = (
                     f'<Relationship Id="{img.rel_id}" '
                     f'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" '
-                    f'Target="media/{img.media_name}"/>'
+                    f'Target="media/{new_media}"/>'
                 )
                 rels = rels.replace("</Relationships>", f"{rel_frag}</Relationships>")
 
+        if doc_xml:
+            members[doc_key] = doc_xml.encode("utf-8")
         members[rels_name] = rels.encode("utf-8")
         return members
 
