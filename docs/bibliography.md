@@ -7,7 +7,7 @@ available.
 
 ## Parser
 
-`src/latex_builder/bib.py` — a minimal BibTeX reader, no external
+`src/document_sanity/bib.py` — a minimal BibTeX reader, no external
 dependencies. It handles:
 
 - `@article{key, field = {value}, field = "value", field = raw, ...}`
@@ -119,7 +119,7 @@ instead of at the end.
 
 | File | Responsibility |
 |---|---|
-| `src/latex_builder/bib.py::parse_bib` | BibTeX reader. |
-| `src/latex_builder/bib.py::render_entry_html` | Per-entry `<li>` rendering. |
-| `src/latex_builder/html_builder.py::CitationCollector` | First-appearance numbering. |
-| `src/latex_builder/md2html.py::_cite` | Per-cite hyperlink emission. |
+| `src/document_sanity/bib.py::parse_bib` | BibTeX reader. |
+| `src/document_sanity/bib.py::render_entry_html` | Per-entry `<li>` rendering. |
+| `src/document_sanity/html_builder.py::CitationCollector` | First-appearance numbering. |
+| `src/document_sanity/md2html.py::_cite` | Per-cite hyperlink emission. |

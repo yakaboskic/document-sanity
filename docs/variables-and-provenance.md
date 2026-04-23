@@ -129,8 +129,8 @@ editing. Keeps prose and data decoupled.
 
 | File | Responsibility |
 |---|---|
-| `src/latex_builder/variable_processor.py` | Core `{{…}}` expansion, used for LaTeX output. |
-| `src/latex_builder/manifest.py::VariableEntry` / `Provenance` | Data classes + YAML parsing. |
-| `src/latex_builder/html_builder.py::_build_resolve_variable` | Builds the `(name, fmt) → (display, provenance, is_defined)` callable that `md_to_html` uses. |
-| `src/latex_builder/md2html.py::_render_variable_span` | Emits the `<span class="var">` with its `data-provenance` JSON attribute. |
-| `src/latex_builder/md2html.py::_prettify_sci_in_math` | Scientific-notation math rewrite. |
+| `src/document_sanity/variable_processor.py` | Core `{{…}}` expansion, used for LaTeX output. |
+| `src/document_sanity/manifest.py::VariableEntry` / `Provenance` | Data classes + YAML parsing. |
+| `src/document_sanity/html_builder.py::_build_resolve_variable` | Builds the `(name, fmt) → (display, provenance, is_defined)` callable that `md_to_html` uses. |
+| `src/document_sanity/md2html.py::_render_variable_span` | Emits the `<span class="var">` with its `data-provenance` JSON attribute. |
+| `src/document_sanity/md2html.py::_prettify_sci_in_math` | Scientific-notation math rewrite. |

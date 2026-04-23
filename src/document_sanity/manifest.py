@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified manifest parser for latex-builder.
+Unified manifest parser for document-sanity.
 
 The manifest.yaml is the single source of configuration for each version.
 It contains metadata, section ordering, variables, figures, and tables --
@@ -126,6 +126,8 @@ TARGET_PREFERENCES: dict[str, tuple[str, ...]] = {
     'pdf':     ('pdf', 'eps', 'svg', 'png', 'jpg', 'jpeg'),
     'html':    ('html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'pdf'),
     'preview': ('png', 'jpg', 'jpeg', 'svg'),
+    # Word embeds raster only — DOCX lacks native PDF/SVG support.
+    'word':    ('png', 'jpg', 'jpeg', 'gif', 'bmp'),
 }
 
 
@@ -206,6 +208,7 @@ class Metadata:
     abstract: Optional[str] = None
     keywords: list[str] = field(default_factory=list)
     template: str = "article"
+    word_template: Optional[str] = None   # .docx template stem (optional)
     document_class: Optional[str] = None
 
 
@@ -263,6 +266,7 @@ class Manifest:
             abstract=raw.get('abstract'),
             keywords=raw.get('keywords', []),
             template=raw.get('template', 'article'),
+            word_template=raw.get('word_template'),
             document_class=raw.get('document_class'),
         )
 
@@ -359,6 +363,8 @@ class Manifest:
             meta['keywords'] = self.metadata.keywords
         if self.metadata.template != 'article':
             meta['template'] = self.metadata.template
+        if self.metadata.word_template:
+            meta['word_template'] = self.metadata.word_template
         if self.metadata.document_class:
             meta['document_class'] = self.metadata.document_class
         if meta:

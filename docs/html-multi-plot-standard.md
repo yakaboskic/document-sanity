@@ -1,6 +1,6 @@
 # HTML multi-plot standard
 
-How `latex-builder` renders interactive figures (Plotly exports, etc.) in the
+How `document-sanity` renders interactive figures (Plotly exports, etc.) in the
 HTML viewer, what layout we expect the source HTML to have, and how the
 normalization pipeline rewrites it at build time.
 
@@ -24,7 +24,7 @@ measurement.
 
 ## The standard
 
-`latex-builder` rewrites every interactive HTML figure into a known shape
+`document-sanity` rewrites every interactive HTML figure into a known shape
 at build time. A figure becomes one of:
 
 - **Single plot** → unchanged body layout; just a tiny resize-reporter
@@ -132,10 +132,10 @@ Every normalized file gets a single HTML comment so we can detect "already
 processed" and skip on rebuilds:
 
 ```html
-<!-- latex-builder:plotly-normalized -->
+<!-- document-sanity:plotly-normalized -->
 ```
 
-The resize-reporter has its own marker (`<!-- latex-builder:iframe-resize-reporter -->`)
+The resize-reporter has its own marker (`<!-- document-sanity:iframe-resize-reporter -->`)
 because single-plot files get it even when no tab rewriting happens.
 
 ## When normalization fires
@@ -154,8 +154,8 @@ out/<ver>/html/figures/<id>.html        # copy in html/ build only
 out/<ver>/html/figures/<id>.html        # normalized in-place, idempotent
 ```
 
-Only `latex-builder html` runs normalization. `latex-builder build` (PDF)
-and `latex-builder preview` leave the source HTML alone — neither
+Only `document-sanity html` runs normalization. `document-sanity build` (PDF)
+and `document-sanity preview` leave the source HTML alone — neither
 consumes interactive figures.
 
 ## Plotly.js source rewriting
@@ -192,7 +192,7 @@ within ~4 KB after the call. If nothing matches, tabs fall back to
 ## Authoring guidelines
 
 - **One-off interactive figure**: export with `fig.write_html("out.html")`.
-  `latex-builder html` will pin it to a reasonable height, wire up the
+  `document-sanity html` will pin it to a reasonable height, wire up the
   resize-reporter, and the HTML viewer's iframe will auto-size. No other
   action required.
 - **Multi-panel figure**: build a Python figure with sub-plots, or write
@@ -204,7 +204,7 @@ within ~4 KB after the call. If nothing matches, tabs fall back to
   fig.update_layout(title="My Figure Label")
   ```
 - **Override the per-plot height**: edit `PLOT_H_PX` in
-  `src/latex_builder/plotly_html.py` (project-wide change). A per-figure
+  `src/document_sanity/plotly_html.py` (project-wide change). A per-figure
   override through the manifest is a future improvement if demand appears.
 - **Non-Plotly HTML**: the tool doesn't need to understand the content.
   Any file with 0 Plotly divs passes through with just the resize-reporter
@@ -215,9 +215,9 @@ within ~4 KB after the call. If nothing matches, tabs fall back to
 
 | File | Role |
 |---|---|
-| `src/latex_builder/plotly_html.py` | `normalize(html) -> (new_html, n_tabs)`, plus the CSS/JS snippets and the balanced-brace div extractor. |
-| `src/latex_builder/html_builder.py::_normalize_plotly_html_figures` | Walks every `*.html` under `out/<ver>/html/figures/` and applies `normalize`. Idempotent. |
-| `src/latex_builder/md2html.py::_img` (under `figure_preview`) | Emits `<iframe class="interactive-fig" scrolling="no" frameborder="0">` when an image src ends in `.html` / `.htm`. |
+| `src/document_sanity/plotly_html.py` | `normalize(html) -> (new_html, n_tabs)`, plus the CSS/JS snippets and the balanced-brace div extractor. |
+| `src/document_sanity/html_builder.py::_normalize_plotly_html_figures` | Walks every `*.html` under `out/<ver>/html/figures/` and applies `normalize`. Idempotent. |
+| `src/document_sanity/md2html.py::_img` (under `figure_preview`) | Emits `<iframe class="interactive-fig" scrolling="no" frameborder="0">` when an image src ends in `.html` / `.htm`. |
 | `INDEX_TEMPLATE` in `html_builder.py` | Provides the parent-side `postMessage` listener and the fallback iframe height. |
 
 ## Troubleshooting

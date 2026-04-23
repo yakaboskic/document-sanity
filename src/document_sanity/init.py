@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Project scaffolding for latex-builder.
+Project scaffolding for document-sanity.
 
 Creates a new project with the standard directory structure,
 a starter manifest.yaml, a default template, and example content.
@@ -11,7 +11,7 @@ from typing import Optional
 from .version import make_version_name
 
 GITIGNORE = """\
-# latex-builder output (generated, not source)
+# document-sanity output (generated, not source)
 out/
 
 # LaTeX intermediate files
@@ -54,8 +54,8 @@ uv.lock
 """
 
 PROJECT_CONFIG = """\
-# latex-builder project configuration
-# See: https://github.com/yakaboskic/latex-builder
+# document-sanity project configuration
+# See: https://github.com/yakaboskic/document-sanity
 
 project:
   name: "{name}"
@@ -189,9 +189,9 @@ Discuss your findings here.
 """
 
 ARTICLE_TEMPLATE = """\
-% latex-builder article template
+% document-sanity article template
 % This template is assembled automatically by the build system.
-% Insertion points are marked with %%LATEX_BUILDER: comments.
+% Insertion points are marked with %%DOCUMENT_SANITY: comments.
 
 \\documentclass[12pt, a4paper]{article}
 
@@ -208,17 +208,17 @@ ARTICLE_TEMPLATE = """\
 \\usepackage{subcaption}
 \\usepackage{natbib}
 
-%%LATEX_BUILDER:PACKAGES
+%%DOCUMENT_SANITY:PACKAGES
 
 \\begin{document}
 
-%%LATEX_BUILDER:TITLE
+%%DOCUMENT_SANITY:TITLE
 
-%%LATEX_BUILDER:ABSTRACT
+%%DOCUMENT_SANITY:ABSTRACT
 
-%%LATEX_BUILDER:CONTENT
+%%DOCUMENT_SANITY:CONTENT
 
-%%LATEX_BUILDER:BIBLIOGRAPHY
+%%DOCUMENT_SANITY:BIBLIOGRAPHY
 
 \\end{document}
 """
@@ -230,7 +230,7 @@ def init_project(
     template: str = "article",
     strategy: str = "both",
 ) -> Path:
-    """Initialize a new latex-builder project.
+    """Initialize a new document-sanity project.
 
     Args:
         name: Project name (also used as directory name)
@@ -261,9 +261,9 @@ def init_project(
         d.mkdir(parents=True, exist_ok=True)
 
     # Write project config
-    config_path = project_dir / "latex-builder.yaml"
+    config_path = project_dir / "document-sanity.yaml"
     config_path.write_text(PROJECT_CONFIG.format(name=name))
-    print(f"    Created: latex-builder.yaml")
+    print(f"    Created: document-sanity.yaml")
 
     # Write .gitignore
     gitignore_path = project_dir / ".gitignore"
@@ -300,6 +300,6 @@ def init_project(
     print(f"  Next steps:")
     print(f"    1. Edit src/{initial_version}/docs/*.md")
     print(f"    2. Update src/{initial_version}/manifest.yaml")
-    print(f"    3. Run: latex-builder build --root {name}")
+    print(f"    3. Run: document-sanity build --root {name}")
 
     return project_dir

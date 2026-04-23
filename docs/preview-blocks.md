@@ -1,6 +1,6 @@
 # Preview blocks
 
-`latex-builder preview` inserts markdown-renderable approximations of
+`document-sanity preview` inserts markdown-renderable approximations of
 ```latex fenced blocks so GitHub / VSCode / Obsidian / Cursor show
 something meaningful when browsing the sources. The ```latex block stays
 the source of truth for LaTeX compilation; the preview block next to it
@@ -18,15 +18,23 @@ is derived, hash-tagged, and regenerable.
 \end{figure}
 ```
 
-<!-- latex-builder:preview:begin hash=a1b2c3d4 -->
+<!-- document-sanity:preview:begin hash=a1b2c3d4 -->
 ![Conceptual overview of the PIGEAN framework.](../figures/pigean-figure-2/pigean-figure-2.png)
-<!-- latex-builder:preview:end -->
+<!-- document-sanity:preview:end -->
 ```
 
 The `hash=a1b2c3d4` is a SHA-256 prefix of the surrounding ```latex
 block's normalized content. `preview --check` uses it to detect drift:
 if the block changes but its preview wasn't refreshed, the command
 returns a non-zero exit code (CI-friendly).
+
+### Legacy marker compatibility
+
+Paper repos authored against the previous tool name (`latex-builder`) use
+`<!-- latex-builder:preview:begin/end -->` markers. The parser accepts
+both forms, so existing `.md` files keep building without edits; the
+next `document-sanity preview` run rewrites old markers to the current
+`document-sanity:*` form.
 
 ## What gets a preview
 
@@ -66,10 +74,10 @@ with figures flattened into `html/figures/`.
 ## Commands
 
 ```bash
-latex-builder preview                # regenerate all preview blocks
-latex-builder preview --check        # error if any are stale (CI)
-latex-builder preview --verbose      # per-file summary of changes
-latex-builder preview --no-expand-macros   # skip \newcommand expansion
+document-sanity preview                # regenerate all preview blocks
+document-sanity preview --check        # error if any are stale (CI)
+document-sanity preview --verbose      # per-file summary of changes
+document-sanity preview --no-expand-macros   # skip \newcommand expansion
 ```
 
 ## Idempotency + drift detection
@@ -88,8 +96,8 @@ block instead.
 
 ## Build integration
 
-`md2latex.py` strips everything between `<!-- latex-builder:preview:begin
-… -->` and `<!-- latex-builder:preview:end -->` during build, so
+`md2latex.py` strips everything between `<!-- document-sanity:preview:begin
+… -->` and `<!-- document-sanity:preview:end -->` during build, so
 preview blocks never leak into the compiled LaTeX output. They're purely
 a reading-the-source aid.
 
@@ -119,8 +127,8 @@ why previews are auto-generated and dismissable.
 
 | File | Responsibility |
 |---|---|
-| `src/latex_builder/preview.py::rewrite_doc` | Core loop over a single doc. |
-| `src/latex_builder/preview.py::figure_preview / table_preview / math_preview` | Per-kind renderers. |
-| `src/latex_builder/preview.py::_resolve_preview_path` | PDF→PNG sibling fallback. |
-| `src/latex_builder/preview.py::hash_block` | Stable normalized-whitespace SHA-256 prefix. |
-| `src/latex_builder/md2latex.py::_PREVIEW_BLOCK_RE` | Strips preview from markdown before LaTeX conversion. |
+| `src/document_sanity/preview.py::rewrite_doc` | Core loop over a single doc. |
+| `src/document_sanity/preview.py::figure_preview / table_preview / math_preview` | Per-kind renderers. |
+| `src/document_sanity/preview.py::_resolve_preview_path` | PDF→PNG sibling fallback. |
+| `src/document_sanity/preview.py::hash_block` | Stable normalized-whitespace SHA-256 prefix. |
+| `src/document_sanity/md2latex.py::_PREVIEW_BLOCK_RE` | Strips preview from markdown before LaTeX conversion. |

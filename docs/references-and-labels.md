@@ -1,6 +1,6 @@
 # References & labels
 
-`latex-builder`'s HTML viewer auto-numbers figures, tables, equations, and
+`document-sanity`'s HTML viewer auto-numbers figures, tables, equations, and
 sections based on the **prefix of the `\label{…}` key**. Use consistent
 prefixes and the renderer generates "Figure 3", "Table 2", clickable
 hyperlinks, and anchor targets for you — no `\newlabel` or `.aux` file
@@ -126,8 +126,8 @@ renderer doesn't know about. The HTML renderer always numbers globally
 
 | File | Responsibility |
 |---|---|
-| `src/latex_builder/html_builder.py::_collect_labels` | Single-pass label harvest across all sections. |
-| `src/latex_builder/html_builder.py::_make_resolve_ref` | Returns the `(display, href)` callable. |
-| `src/latex_builder/html_builder.py::_LABEL_KIND_NAMES` | Prefix → kind-name map. |
-| `src/latex_builder/md2html.py::_ref` / `_label` / `_anchor` | Per-line ref rendering and anchor protection. |
-| `src/latex_builder/md2html.py::_replace_latex_fence` | Pulls `\label{}` out of stripped ```latex blocks and emits anchors. |
+| `src/document_sanity/html_builder.py::_collect_labels` | Single-pass label harvest across all sections. |
+| `src/document_sanity/html_builder.py::_make_resolve_ref` | Returns the `(display, href)` callable. |
+| `src/document_sanity/html_builder.py::_LABEL_KIND_NAMES` | Prefix → kind-name map. |
+| `src/document_sanity/md2html.py::_ref` / `_label` / `_anchor` | Per-line ref rendering and anchor protection. |
+| `src/document_sanity/md2html.py::_replace_latex_fence` | Pulls `\label{}` out of stripped ```latex blocks and emits anchors. |

@@ -14,9 +14,9 @@ markers and tagged with a content hash of the source latex block:
         \\caption{A figure.}
     \\end{figure}
     ```
-    <!-- latex-builder:preview:begin hash=abcd1234 -->
+    <!-- document-sanity:preview:begin hash=abcd1234 -->
     ![A figure.](figures/foo.png)
-    <!-- latex-builder:preview:end -->
+    <!-- document-sanity:preview:end -->
 
 `preview` rewrites (or creates) these blocks; hand-edits between the
 markers get overwritten. `preview --check` reports stale/missing blocks
@@ -29,10 +29,16 @@ from pathlib import Path
 from typing import Optional
 
 
+# Accept both current `document-sanity:preview:*` markers and the legacy
+# `latex-builder:preview:*` form so existing paper repos keep parsing. The
+# writer emits only the current form below — old markers get rewritten the
+# next time the user runs `document-sanity preview`.
 PREVIEW_BEGIN_RE = re.compile(
-    r'<!--\s*latex-builder:preview:begin(?:\s+hash=([0-9a-f]+))?\s*-->'
+    r'<!--\s*(?:document-sanity|latex-builder):preview:begin(?:\s+hash=([0-9a-f]+))?\s*-->'
 )
-PREVIEW_END_RE = re.compile(r'<!--\s*latex-builder:preview:end\s*-->')
+PREVIEW_END_RE = re.compile(
+    r'<!--\s*(?:document-sanity|latex-builder):preview:end\s*-->'
+)
 
 # Parse \newcommand{\name}{body} and \providecommand{\name}{body} with NO args.
 # Multi-arg forms like \newcommand{\foo}[1]{...} are skipped (too lossy to expand safely).
@@ -500,9 +506,9 @@ def _render_preview_body(block: str, figures: dict,
 
 def _emit_preview(hash_hex: str, body: str) -> list[str]:
     return [
-        f'<!-- latex-builder:preview:begin hash={hash_hex} -->',
+        f'<!-- document-sanity:preview:begin hash={hash_hex} -->',
         body,
-        '<!-- latex-builder:preview:end -->',
+        '<!-- document-sanity:preview:end -->',
     ]
 
 

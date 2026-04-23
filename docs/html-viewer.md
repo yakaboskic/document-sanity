@@ -1,6 +1,6 @@
 # HTML viewer
 
-`latex-builder html` emits a single self-contained `index.html` (plus
+`document-sanity html` emits a single self-contained `index.html` (plus
 `figures/` copied alongside) with an interactive reading experience:
 TOC sidebar, client-side math, clickable variables with a provenance
 panel, expand-to-modal on figures, scroll-spy on the nav, hyperlinked
@@ -186,9 +186,9 @@ background, border-collapse layout) or from `_convert_table` in
 
 | File | Responsibility |
 |---|---|
-| `src/latex_builder/html_builder.py::build_html` | End-to-end orchestration. |
-| `src/latex_builder/html_builder.py::INDEX_TEMPLATE` | The single-file HTML page template (HTML + embedded CSS + JS). |
-| `src/latex_builder/md2html.py::md_to_html` | Markdown → HTML fragment converter. |
-| `src/latex_builder/plotly_html.py` | Plotly HTML normalizer (tabs + postMessage). |
-| `src/latex_builder/bib.py` | BibTeX parser + citation rendering. |
-| `src/latex_builder/cli.py::cmd_html` | CLI entry point. |
+| `src/document_sanity/html_builder.py::build_html` | End-to-end orchestration. |
+| `src/document_sanity/html_builder.py::INDEX_TEMPLATE` | The single-file HTML page template (HTML + embedded CSS + JS). |
+| `src/document_sanity/md2html.py::md_to_html` | Markdown → HTML fragment converter. |
+| `src/document_sanity/plotly_html.py` | Plotly HTML normalizer (tabs + postMessage). |
+| `src/document_sanity/bib.py` | BibTeX parser + citation rendering. |
+| `src/document_sanity/cli.py::cmd_html` | CLI entry point. |

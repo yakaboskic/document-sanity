@@ -8,7 +8,7 @@ plots in one file, stacking them in an iframe is awkward: either the plots
 fight each other for the iframe's vertical space or, with autosize, they
 create a height feedback loop with any parent-side resizer.
 
-This module rewrites a Plotly HTML file into the "latex-builder standard":
+This module rewrites a Plotly HTML file into the "document-sanity standard":
 
     <div class="lb-plotly-tabs">
       <nav class="lb-tab-bar">
@@ -40,8 +40,8 @@ import re
 from dataclasses import dataclass
 
 
-MARKER = '<!-- latex-builder:plotly-normalized -->'
-REPORTER_MARKER = '<!-- latex-builder:iframe-resize-reporter -->'
+MARKER = '<!-- document-sanity:plotly-normalized -->'
+REPORTER_MARKER = '<!-- document-sanity:iframe-resize-reporter -->'
 
 # Height reserved per plot inside a tab panel. A fixed value breaks the
 # feedback loop between Plotly's `height:100%` and the iframe's own height.
@@ -192,7 +192,7 @@ _TAB_SWITCHER_JS = """
 """
 
 _RESIZE_REPORTER_SCRIPT = """
-<!-- latex-builder:iframe-resize-reporter -->
+<!-- document-sanity:iframe-resize-reporter -->
 <script>
 (function(){
   if (window.parent === window) return;

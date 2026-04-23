@@ -6,7 +6,7 @@ Designed to consume the same markdown docs used as source-of-truth for LaTeX,
 but emits HTML suitable for interactive rendering:
 
 - ```latex pass-through blocks are DROPPED (PDF-only).
-- latex-builder:preview:begin/end markers are stripped, contents kept (already
+- document-sanity:preview:begin/end markers are stripped, contents kept (already
   markdown — figures as ![alt](path), math as $$...$$, tables as | ... | grids).
 - Inline math $...$, display $$...$$, and \\[...\\] are preserved verbatim for
   client-side KaTeX to render.
@@ -36,9 +36,11 @@ def slugify(text: str) -> str:
     return text or 'section'
 
 
-# Preview markers and latex fences we strip before rendering
+# Preview markers and latex fences we strip before rendering. Accept both the
+# current `document-sanity:preview:*` form and the legacy `latex-builder:preview:*`
+# form so existing paper repos render without a forced edit.
 _PREVIEW_BLOCK_RE = re.compile(
-    r'<!--\s*latex-builder:preview:begin[^>]*-->\s*(.*?)\s*<!--\s*latex-builder:preview:end\s*-->',
+    r'<!--\s*(?:document-sanity|latex-builder):preview:begin[^>]*-->\s*(.*?)\s*<!--\s*(?:document-sanity|latex-builder):preview:end\s*-->',
     re.DOTALL,
 )
 _LATEX_FENCE_RE = re.compile(

@@ -1056,7 +1056,7 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
 
     # Post-process interactive (.html) figures: normalize Plotly exports
     # (multi-plot → tabbed layout) and inject the parent-side resize reporter.
-    # See src/latex_builder/plotly_html.py and docs/html-multi-plot-standard.md.
+    # See src/document_sanity/plotly_html.py and docs/html-multi-plot-standard.md.
     _normalize_plotly_html_figures(html_dir / 'figures', verbose=verbose)
 
     print(f'  HTML written: {index_path}')

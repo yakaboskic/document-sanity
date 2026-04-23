@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 r"""
-Build pipeline for latex-builder v2.
+Build pipeline for document-sanity v2.
 
 Pipeline:
   src/<version>/docs/*.md  -->  out/<version>/latex/sections/*.tex
@@ -269,13 +269,19 @@ class ManuscriptBuilder:
         # If bibliography wasn't placed inline, put it at the end (default)
         bib_block = '' if bib_placed else bib_cmd
 
-        # Fill template
+        # Fill template. Accept both current %%DOCUMENT_SANITY:* markers and
+        # legacy %%LATEX_BUILDER:* markers — paper repos authored against the
+        # old tool name keep building without a forced edit.
         main_tex = template
-        main_tex = main_tex.replace('%%LATEX_BUILDER:PACKAGES', '')
-        main_tex = main_tex.replace('%%LATEX_BUILDER:TITLE', title_block)
-        main_tex = main_tex.replace('%%LATEX_BUILDER:ABSTRACT', abstract_block)
-        main_tex = main_tex.replace('%%LATEX_BUILDER:CONTENT', content_block)
-        main_tex = main_tex.replace('%%LATEX_BUILDER:BIBLIOGRAPHY', bib_block)
+        for markers, replacement in [
+            (('%%DOCUMENT_SANITY:PACKAGES', '%%LATEX_BUILDER:PACKAGES'), ''),
+            (('%%DOCUMENT_SANITY:TITLE', '%%LATEX_BUILDER:TITLE'), title_block),
+            (('%%DOCUMENT_SANITY:ABSTRACT', '%%LATEX_BUILDER:ABSTRACT'), abstract_block),
+            (('%%DOCUMENT_SANITY:CONTENT', '%%LATEX_BUILDER:CONTENT'), content_block),
+            (('%%DOCUMENT_SANITY:BIBLIOGRAPHY', '%%LATEX_BUILDER:BIBLIOGRAPHY'), bib_block),
+        ]:
+            for marker in markers:
+                main_tex = main_tex.replace(marker, replacement)
 
         # Process any remaining variables in main.tex
         main_tex = self.processor.replace_variables(main_tex, 'main.tex')

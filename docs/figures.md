@@ -1,6 +1,6 @@
 # Figures
 
-`latex-builder` chooses the right figure artifact per build target and
+`document-sanity` chooses the right figure artifact per build target and
 auto-crops whitespace from raster images during output.
 
 ## Directory layout
@@ -51,12 +51,14 @@ preference order:
 |---|---|
 | PDF build   | `pdf → eps → svg → png → jpg/jpeg` |
 | HTML viewer | `html → svg → png → jpg/jpeg → pdf` |
+| Word build  | `png → jpg/jpeg → gif → bmp` |
 | MD preview  | `png → jpg/jpeg → svg` |
 
 Defined in `manifest.py::TARGET_PREFERENCES`. PDF prefers vector so print
 output stays crisp; HTML prefers interactive over vector since a
-self-contained `.html` figure beats a static SVG in the browser; MD
-preview skips `pdf` / `html` because markdown viewers can't render them.
+self-contained `.html` figure beats a static SVG in the browser; Word
+embeds raster only because DOCX has no native PDF/SVG support; MD preview
+skips `pdf` / `html` because markdown viewers can't render them.
 
 ## Canva pages
 
@@ -130,9 +132,9 @@ directly.
 
 | File | Responsibility |
 |---|---|
-| `src/latex_builder/manifest.py::FigureEntry` + `resolve_figure()` | Resolution logic; `TARGET_PREFERENCES` constant lives here. |
-| `src/latex_builder/variable_processor.py::_resolve_figure` | Rewrites `{{fig:...}}` / `{{canva:...}}` in LaTeX output to `\includegraphics` with the target-resolved path. |
-| `src/latex_builder/build.py::copy_figures` | PDF-target crop + flatten copy. |
-| `src/latex_builder/html_builder.py::_compute_figures_copy_plan` + `_upgrade_figure_path` | HTML-target copy; rewrites `![](…)` paths in markdown to HTML-preferred artifacts. |
-| `src/latex_builder/figure_crop.py` | Whitespace detection + crop implementation (Pillow-backed). |
-| `src/latex_builder/preview.py::figure_preview` + `_resolve_preview_path` | Markdown preview block generation, PDF→PNG sibling fallback. |
+| `src/document_sanity/manifest.py::FigureEntry` + `resolve_figure()` | Resolution logic; `TARGET_PREFERENCES` constant lives here. |
+| `src/document_sanity/variable_processor.py::_resolve_figure` | Rewrites `{{fig:...}}` / `{{canva:...}}` in LaTeX output to `\includegraphics` with the target-resolved path. |
+| `src/document_sanity/build.py::copy_figures` | PDF-target crop + flatten copy. |
+| `src/document_sanity/html_builder.py::_compute_figures_copy_plan` + `_upgrade_figure_path` | HTML-target copy; rewrites `![](…)` paths in markdown to HTML-preferred artifacts. |
+| `src/document_sanity/figure_crop.py` | Whitespace detection + crop implementation (Pillow-backed). |
+| `src/document_sanity/preview.py::figure_preview` + `_resolve_preview_path` | Markdown preview block generation, PDF→PNG sibling fallback. |

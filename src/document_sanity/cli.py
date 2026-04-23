@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI entry point for latex-builder v2.
+CLI entry point for document-sanity v2.
 
 Commands:
   init           Initialize a new project
@@ -217,7 +217,7 @@ def cmd_import(args: argparse.Namespace) -> int:
         print(f"  Figures:   {n_figs}")
         print(f"  Tables:    {n_tables}")
         print(f"  Output:    {output_dir}")
-        print(f"\n  Next: latex-builder build --root {target_dir} --version {version_name}")
+        print(f"\n  Next: document-sanity build --root {target_dir} --version {version_name}")
 
         return 0
 
@@ -275,6 +275,75 @@ def cmd_preview(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_word(args: argparse.Namespace) -> int:
+    """Build a Word (.docx) output, or extract styles from a template."""
+    from .docx_builder import WordBuilder, find_latest_version
+
+    root_dir = Path(args.root).resolve()
+    template = Path(args.template).resolve() if args.template else None
+    styles = Path(args.styles).resolve() if args.styles else None
+
+    if args.extract_styles:
+        # Just produce a styles.json from the template; no manifest needed if
+        # the user passed an explicit template.
+        if not template:
+            # Need a manifest to locate the template.
+            try:
+                version = args.version or find_latest_version(root_dir)
+            except ValueError as e:
+                print(f"  Error: {e}", file=sys.stderr)
+                return 1
+            builder = WordBuilder(
+                root_dir=root_dir,
+                version=version,
+                template_override=None,
+                styles_override=None,
+                verbose=args.verbose,
+            )
+            dest = Path(args.output) if args.output else (
+                root_dir / "out" / version / "word" / "styles.json"
+            )
+            result = builder.extract_styles_to(dest)
+        else:
+            from .docx_extract import extract_styles
+            from .docx_styles import save_styles
+
+            dest = Path(args.output) if args.output else template.with_suffix(".styles.json")
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            save_styles(dest, extract_styles(template))
+            result = dest
+        print(f"  Styles extracted -> {result}")
+        return 0
+
+    version = args.version
+    if version is None:
+        try:
+            version = find_latest_version(root_dir)
+            print(f"  Auto-detected version: {version}")
+        except ValueError as e:
+            print(f"  Error: {e}", file=sys.stderr)
+            return 1
+
+    try:
+        builder = WordBuilder(
+            root_dir=root_dir,
+            version=version,
+            template_override=template,
+            styles_override=styles,
+            placeholder=args.placeholder,
+            strict=args.strict,
+            verbose=args.verbose,
+        )
+        ok = builder.build()
+        return 0 if ok else 1
+    except Exception as e:
+        print(f"\n  Error: {e}", file=sys.stderr)
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
+
+
 def cmd_convert(args: argparse.Namespace) -> int:
     """Convert a single file."""
     input_path = Path(args.input)
@@ -313,7 +382,7 @@ def cmd_convert(args: argparse.Namespace) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="latex-builder",
+        prog="document-sanity",
         description="Build LaTeX documents from Markdown source with variable substitution, provenance tracking, and versioned builds.",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -384,6 +453,22 @@ def main() -> None:
                         help='Skip expanding \\newcommand macros from the template '
                              '(leaves \\prob etc. unresolved in md math)')
 
+    # --- word ---
+    word_p = subparsers.add_parser(
+        "word",
+        help="Build a Word (.docx) output from the same markdown sources as `build`.",
+    )
+    word_p.add_argument('--version', '-V', help='Version to build (default: auto-detect latest)')
+    word_p.add_argument('--root', '-r', default='.', help='Project root directory')
+    word_p.add_argument('--template', '-t', help='Path to a .docx template (overrides manifest)')
+    word_p.add_argument('--styles', '-s', help='Styles JSON to apply (default: extract from template)')
+    word_p.add_argument('--output', '-o', help='Output path (for --extract-styles)')
+    word_p.add_argument('--extract-styles', action='store_true',
+                        help='Write the extracted styles.json instead of building a .docx')
+    word_p.add_argument('--placeholder', default='XXXX', help='Placeholder for undefined variables')
+    word_p.add_argument('--strict', action='store_true', help='Fail on undefined variables')
+    word_p.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
+
     # --- convert ---
     conv_p = subparsers.add_parser("convert", help="Convert a single file (md<->tex)")
     conv_p.add_argument('input', help='Input file')
@@ -407,6 +492,7 @@ def main() -> None:
         'import': cmd_import,
         'preview': cmd_preview,
         'html': cmd_html,
+        'word': cmd_word,
         'convert': cmd_convert,
     }
 

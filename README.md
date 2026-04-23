@@ -1,22 +1,25 @@
-# latex-builder
+# document-sanity
 
-Build LaTeX documents, interactive HTML viewers, and preview-friendly markdown
-from a single Markdown source of truth. `manifest.yaml` is the one source of
-configuration per version; variables carry provenance; figures/equations/tables
-render both to PDF and to markdown-native previews for GitHub/VSCode/Obsidian.
+Build PDF (LaTeX), interactive HTML, Word (`.docx`), and preview-friendly
+markdown — all from a single Markdown source of truth. `manifest.yaml` is the
+one source of configuration per version; variables carry provenance;
+figures/equations/tables render across every target, including inline
+GitHub/VSCode/Obsidian previews.
 
 ## What it does
 
 | Command | Output | When to use |
 |---|---|---|
-| `latex-builder build --compile` | `out/<ver>/pdf/main.pdf` | Build the paper PDF. |
-| `latex-builder html --open` | `out/<ver>/html/index.html` | Interactive viewer: TOC sidebar, KaTeX math, clickable variables with a provenance panel, hyperlinked bibliography. |
-| `latex-builder preview` | Inline preview blocks in each `.md` | Make ```latex figure/equation/table blocks render as `![alt](path)` / `$$...$$` / `\|cell\|` so GitHub shows something meaningful. Idempotent; hash-tagged. |
-| `latex-builder preview --check` | Exit 1 if stale | CI-friendly. |
-| `latex-builder import` | New `src/<ver>/` tree | Convert an existing `\input{}`-style LaTeX project into the markdown-as-source-of-truth layout. |
-| `latex-builder new-version` | Copied `src/<ver>/` | Snapshot today's version from the previous one. |
-| `latex-builder init <name>` | Fresh project scaffold | Start a new manuscript project from scratch. |
-| `latex-builder convert file.md/.tex` | The other format | One-off md↔tex conversion (useful for scripting). |
+| `document-sanity build --compile` | `out/<ver>/pdf/main.pdf` | Build the paper PDF. |
+| `document-sanity html --open` | `out/<ver>/html/index.html` | Interactive viewer: TOC sidebar, KaTeX math, clickable variables with a provenance panel, hyperlinked bibliography. |
+| `document-sanity word` | `out/<ver>/word/main.docx` | Build a Word document from a `.docx` template in `templates/` — styles are extracted from the template, figures are embedded, citations render as a numbered References list. |
+| `document-sanity word --extract-styles` | `out/<ver>/word/styles.json` | Dump the template's extracted styles so you can hand-tune before the next build. |
+| `document-sanity preview` | Inline preview blocks in each `.md` | Make ```latex figure/equation/table blocks render as `![alt](path)` / `$$...$$` / `\|cell\|` so GitHub shows something meaningful. Idempotent; hash-tagged. |
+| `document-sanity preview --check` | Exit 1 if stale | CI-friendly. |
+| `document-sanity import` | New `src/<ver>/` tree | Convert an existing `\input{}`-style LaTeX project into the markdown-as-source-of-truth layout. |
+| `document-sanity new-version` | Copied `src/<ver>/` | Snapshot today's version from the previous one. |
+| `document-sanity init <name>` | Fresh project scaffold | Start a new manuscript project from scratch. |
+| `document-sanity convert file.md/.tex` | The other format | One-off md↔tex conversion (useful for scripting). |
 
 ## Documentation
 
@@ -32,7 +35,7 @@ Opinionated conventions are documented in detail under [`docs/`](./docs):
 
 ## Use it in your paper project (recommended)
 
-Create a separate repo for each paper and declare `latex-builder` as a
+Create a separate repo for each paper and declare `document-sanity` as a
 dependency. This keeps paper content out of the tool's history and lets
 multiple papers track different versions independently.
 
@@ -44,7 +47,7 @@ name = "my-paper"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "latex-builder @ git+https://github.com/yakaboskic/latex-builder.git@main",
+    "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@main",
 ]
 
 [build-system]
@@ -61,9 +64,9 @@ bypass-selection = true          # this repo has no importable Python
 Then:
 
 ```bash
-uv sync                           # install latex-builder from GitHub
-uv run latex-builder build --compile
-uv run latex-builder html --open
+uv sync                           # install document-sanity from GitHub
+uv run document-sanity build --compile
+uv run document-sanity html --open
 ```
 
 A reference `Makefile` for paper repos is in
@@ -75,10 +78,10 @@ A reference `Makefile` for paper repos is in
 For local development on the tool itself:
 
 ```bash
-git clone https://github.com/yakaboskic/latex-builder
-cd latex-builder
+git clone https://github.com/yakaboskic/document-sanity
+cd document-sanity
 uv sync
-uv run latex-builder --help
+uv run document-sanity --help
 ```
 
 ## Project layout
@@ -87,7 +90,7 @@ A paper project has this shape:
 
 ```
 my-paper/
-├── pyproject.toml              # declares latex-builder dependency
+├── pyproject.toml              # declares document-sanity dependency
 ├── templates/
 │   ├── article.tex             # or nature.tex for sn-jnl (Springer Nature)
 │   ├── *.cls / *.bst           # class + bib style files copied into build
@@ -181,7 +184,7 @@ are reported in the build summary.
 
 ## Preview blocks
 
-`latex-builder preview` auto-generates a markdown approximation next to each
+`document-sanity preview` auto-generates a markdown approximation next to each
 ```latex block so GitHub renders something useful:
 
 ~~~markdown
@@ -193,9 +196,9 @@ are reported in the build summary.
 \end{figure}
 ```
 
-<!-- latex-builder:preview:begin hash=a1b2c3d4 -->
+<!-- document-sanity:preview:begin hash=a1b2c3d4 -->
 ![Framework overview.](../figures/overview.png)
-<!-- latex-builder:preview:end -->
+<!-- document-sanity:preview:end -->
 ~~~
 
 - Block kinds handled: `figure`/`figure*`, `table`/`table*`/`longtable`,
@@ -211,7 +214,7 @@ are reported in the build summary.
 
 ## Interactive HTML viewer
 
-`latex-builder html` emits a single `index.html` (plus copied `figures/`)
+`document-sanity html` emits a single `index.html` (plus copied `figures/`)
 with:
 
 - Left sidebar TOC with scroll-spy and hyperlinked headings.
@@ -230,34 +233,37 @@ with:
 ## Build pipeline
 
 ```
-src/<ver>/docs/*.md   ──┐
-src/<ver>/manifest.yaml ─┼─► out/<ver>/latex/main.tex  ──► out/<ver>/pdf/main.pdf
-templates/<tmpl>.tex  ──┘                    └─ bibtex resolved (pdflatex runs
-                                                in the latex/ dir so
-                                                openout_any=p doesn't block)
+                             ┌─► out/<ver>/latex/main.tex ──► out/<ver>/pdf/main.pdf
+src/<ver>/docs/*.md     ─┐   │
+src/<ver>/manifest.yaml ─┼───┼─► out/<ver>/html/index.html
+src/<ver>/figures/       │   │
+templates/<tmpl>.tex    ─┤   └─► out/<ver>/word/main.docx
+templates/<tmpl>.docx   ─┘
 ```
 
-Section order and the bibliography placement are controlled from
+The same markdown sources feed PDF (via LaTeX), HTML, and Word simultaneously.
+Section order and bibliography placement are controlled from
 `manifest.sections`. `_bibliography` is a pseudo-section that inserts
-`\bibliography{references}` at that point; `_toc` similarly for
+`\bibliography{references}` (LaTeX) / a References section (Word) /
+a bibliography pane (HTML) at that point; `_toc` similarly for
 `\tableofcontents`.
 
 ## Versioning
 
 ```bash
-latex-builder new-version               # copy latest -> MMDDYYYY-<fun-name>/
-latex-builder new-version --strategy date    # MMDDYYYY
-latex-builder new-version --strategy fun     # elegant-crimson-fox
-latex-builder new-version --strategy both    # MMDDYYYY-elegant-crimson-fox (default)
+document-sanity new-version               # copy latest -> MMDDYYYY-<fun-name>/
+document-sanity new-version --strategy date    # MMDDYYYY
+document-sanity new-version --strategy fun     # elegant-crimson-fox
+document-sanity new-version --strategy both    # MMDDYYYY-elegant-crimson-fox (default)
 ```
 
-`latex-builder build` / `html` / `preview` all auto-detect the latest
+`document-sanity build` / `html` / `preview` all auto-detect the latest
 dated version if `--version` isn't given.
 
 ## Importing an existing LaTeX project
 
 ```bash
-latex-builder import \
+document-sanity import \
   --source ./my-old-paper \
   --target ./my-new-paper \
   --manuscript indirect-support \
@@ -271,9 +277,35 @@ preserving environments we can't losslessly markdown-ify (figures, tables,
 align, etc.), variables are copied from `variables/<manuscript>.json`, the
 bib and figures are brought along.
 
+## Word (.docx) output
+
+Drop a `.docx` template into `templates/` and `document-sanity word` emits a
+Word document from the same markdown sources:
+
+```
+templates/apiflow.docx         # headers, footers, theme, fonts — all preserved
+src/<ver>/manifest.yaml        # points at it via metadata.word_template: apiflow
+src/<ver>/docs/*.md            # same sections as the LaTeX build
+```
+
+- **Styles** are extracted from the template's `styles.xml` + `theme1.xml`
+  (Title / Heading 1-3 / Normal, accent colors) and applied to the generated
+  body. Pass `--styles path.json` to override after hand-tuning.
+- **Variables** (`{{VAR}}`, `{{VAR:.2e}}`) resolve the same way as in the
+  LaTeX build, using `manifest.variables`.
+- **Figures** — `![alt](path)` and ` ```latex \includegraphics{path} ``` `
+  blocks are embedded inline as centered drawings with a caption. The
+  `'word'` target prefers `png/jpg/gif/bmp` (DOCX has no native PDF/SVG).
+- **Bibliography** — `\cite{key}` renders as numbered `[N]` inline;
+  duplicate keys reuse the same number. A `References` section is appended
+  at the end (or wherever `_bibliography` is placed in `manifest.sections`).
+- **Body preservation** — only the template's `<w:sectPr>` (headers,
+  footers, margins, theme refs) is kept. Body content is replaced.
+
 ## Library inspiration
 
-- [word-builder](https://github.com/yakaboskic/word-builder) — CLI architecture
-  and markdown-as-source philosophy.
+- [word-builder](https://github.com/yakaboskic/word-builder) — CLI architecture,
+  docx-template philosophy (now ported into this project as the `word`
+  subcommand).
 - [pigean-manuscripts](https://github.com/yakaboskic/pigean-manuscripts) —
   original build system, variable processor, figure manifest, versioning scheme.

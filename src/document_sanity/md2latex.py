@@ -261,7 +261,8 @@ def _convert_table(lines: list[str]) -> str:
 
 
 _PREVIEW_BLOCK_RE = re.compile(
-    r'<!--\s*latex-builder:preview:begin[^>]*-->.*?<!--\s*latex-builder:preview:end\s*-->\s*',
+    r'<!--\s*(?:document-sanity|latex-builder):preview:begin[^>]*-->'
+    r'.*?<!--\s*(?:document-sanity|latex-builder):preview:end\s*-->\s*',
     re.DOTALL,
 )
 

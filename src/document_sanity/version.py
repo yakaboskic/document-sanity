@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Version naming for latex-builder.
+Version naming for document-sanity.
 
 Supports three version naming strategies:
   - "date"     : MMDDYYYY (e.g., 04202026)

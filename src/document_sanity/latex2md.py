@@ -3,7 +3,7 @@
 LaTeX to Markdown converter.
 
 Converts LaTeX source files to Markdown for use as source-of-truth in
-the latex-builder pipeline. Handles:
+the document-sanity pipeline. Handles:
 
 - \\section, \\subsection, \\subsubsection -> #, ##, ###
 - \\textbf, \\textit, \\texttt -> **bold**, *italic*, `code`
