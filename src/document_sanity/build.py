@@ -198,8 +198,18 @@ class ManuscriptBuilder:
                 if self.verbose:
                     print(f"    [md->tex] {section_ref} -> {rel_path}")
 
+                # Expand {{tab:id}} tokens in the raw markdown so the
+                # table appears as a native markdown pipe table for
+                # md2latex to convert. Has to happen on .md, not on .tex.
+                from .manifest import expand_table_tokens
+                md_text = src_path.read_text(encoding='utf-8')
+                md_text = expand_table_tokens(md_text, self.manifest.tables, self.src_dir)
+
                 # Convert md -> tex (with escape_text=False for LaTeX pass-through)
-                convert_md_file(src_path, out_path, escape_text=False)
+                from .md2latex import md_to_latex
+                _, latex_body = md_to_latex(md_text, escape_text=False)
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text(latex_body, encoding='utf-8')
 
                 # Then process variables
                 content = out_path.read_text(encoding='utf-8')

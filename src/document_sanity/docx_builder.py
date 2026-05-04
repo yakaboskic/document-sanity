@@ -224,6 +224,10 @@ class WordBuilder:
             if self.verbose:
                 print(f"    [md->docx] {section_ref}")
             content = src_path.read_text(encoding="utf-8")
+            # Expand {{tab:id}} on the raw markdown so md2docx sees a
+            # native pipe table (consistent with the LaTeX/HTML paths).
+            from .manifest import expand_table_tokens
+            content = expand_table_tokens(content, self.manifest.tables, self.src_dir)
             content = self.processor.replace_variables(content, str(src_path))
             render_markdown(
                 content,

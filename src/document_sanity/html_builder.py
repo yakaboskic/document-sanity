@@ -988,6 +988,10 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
             print(f'  WARNING: section not found: {section_ref}')
             continue
         md_text = doc_path.read_text(encoding='utf-8')
+        # Expand {{tab:id}} tokens in the raw markdown before any other
+        # processing — md_to_html will then see a native pipe table.
+        from .manifest import expand_table_tokens
+        md_text = expand_table_tokens(md_text, manifest.tables, src_dir)
         md_text = _upgrade_figure_path(md_text)
         body = md_to_html(md_text, resolve, resolve_citation=citations.resolve, resolve_ref=resolve_ref)
         section_htmls.append(_render_section_html(body))

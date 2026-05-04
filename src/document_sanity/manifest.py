@@ -189,11 +189,75 @@ def resolve_figure(entry: FigureEntry, target: str,
 
 @dataclass
 class TableEntry:
-    """A table definition with optional provenance."""
+    """A table definition with optional provenance.
+
+    Supported `format` values:
+      - csv       : comma-separated; expanded to a markdown pipe table
+      - tsv       : tab-separated; expanded to a markdown pipe table
+      - markdown  : the source file is already a markdown table; inlined
+      - latex     : the source file is a raw .tex tabular fragment; the
+                    user references it via \\input{tables/foo.tex} inside
+                    a ```latex block in their markdown (no token expansion)
+
+    The csv/tsv/markdown formats are the data-driven path: a single
+    `{{tab:id}}` token in markdown expands to a markdown pipe table on
+    load, which then flows through md2latex / md2html / md2docx natively.
+    """
     id: str
     source: Optional[str] = None
-    format: str = "latex"                   # latex, markdown, csv
+    format: str = "latex"
     provenance: Optional[Provenance] = None
+
+
+def _csv_to_markdown_table(text: str, sep: str) -> str:
+    """Convert delimited text to a markdown pipe table. Empty rows are
+    skipped; cells are stripped. The first row is the header."""
+    import csv
+    import io
+    rows = [row for row in csv.reader(io.StringIO(text), delimiter=sep) if any(c.strip() for c in row)]
+    if not rows:
+        return ""
+    header = [c.strip() for c in rows[0]]
+    body = [[c.strip() for c in r] for r in rows[1:]]
+    out = ["| " + " | ".join(header) + " |"]
+    out.append("|" + "|".join("---" for _ in header) + "|")
+    for r in body:
+        # Pad short rows
+        cells = list(r) + [""] * (len(header) - len(r))
+        out.append("| " + " | ".join(cells[: len(header)]) + " |")
+    return "\n".join(out)
+
+
+def expand_table_tokens(md: str, tables: dict, src_dir: "Path") -> str:
+    """Replace {{tab:id}} tokens in `md` with the table's markdown
+    representation. Only csv/tsv/markdown formats are expanded — `latex`
+    is left to the user's own \\input{}. Unresolved ids are left
+    untouched and surface as 'undefined' through the variable processor."""
+    import re as _re
+    pattern = _re.compile(r'\{\{tab:([a-zA-Z_][a-zA-Z0-9_]*)\}\}')
+
+    def _resolve(m):
+        tid = m.group(1)
+        entry = tables.get(tid)
+        if entry is None or not entry.source:
+            return m.group(0)
+        path = Path(entry.source)
+        if not path.is_absolute():
+            path = src_dir / path
+        if not path.exists():
+            return m.group(0)
+        text = path.read_text(encoding='utf-8')
+        fmt = (entry.format or "").lower()
+        if fmt == "csv":
+            return _csv_to_markdown_table(text, sep=",")
+        if fmt == "tsv":
+            return _csv_to_markdown_table(text, sep="\t")
+        if fmt == "markdown":
+            return text.strip()
+        # latex / unknown — leave the token alone
+        return m.group(0)
+
+    return pattern.sub(_resolve, md)
 
 
 @dataclass
