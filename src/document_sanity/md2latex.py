@@ -332,15 +332,23 @@ def md_to_latex(
                 output.append(converted.rstrip())
                 i += 1
                 continue
-            # Otherwise, strip the inline comment from the line entirely
-            # (LaTeX % comments would eat the rest of the line including content after them)
-            line = _re.sub(r'\s*<!--\s*.*?\s*-->\s*', ' ', line).rstrip()
-            lines[i] = line
-            stripped = line.strip()
-            if not stripped:
-                output.append('')
-                i += 1
-                continue
+            # Headings carry an embedded `<!-- \label{...} -->` by convention.
+            # Convert the comment in place and let the heading handler below
+            # extract the label — don't strip it.
+            if stripped.startswith('#'):
+                line = converted
+                lines[i] = line
+                stripped = line.strip()
+            else:
+                # Otherwise, strip the inline comment from the line entirely
+                # (LaTeX % comments would eat the rest of the line including content after them)
+                line = _re.sub(r'\s*<!--\s*.*?\s*-->\s*', ' ', line).rstrip()
+                lines[i] = line
+                stripped = line.strip()
+                if not stripped:
+                    output.append('')
+                    i += 1
+                    continue
 
         # LaTeX pass-through block: ```latex ... ```
         if stripped.startswith('```latex'):
