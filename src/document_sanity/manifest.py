@@ -122,8 +122,14 @@ class FigureEntry:
 
 # Default file-format preference per build target. First extension that exists
 # in the figure's directory (or in the `formats` map) wins.
+#
+# Note on .svg for the 'pdf' target: base pdflatex (with graphicx) does NOT
+# support .svg natively — including one yields "Unknown graphics extension".
+# The svg package can include them but requires --shell-escape and inkscape,
+# which is not in the default template. So .svg is deprioritized below .png
+# for pdf and listed last as a desperate fallback.
 TARGET_PREFERENCES: dict[str, tuple[str, ...]] = {
-    'pdf':     ('pdf', 'eps', 'svg', 'png', 'jpg', 'jpeg'),
+    'pdf':     ('pdf', 'png', 'jpg', 'jpeg', 'eps', 'svg'),
     'html':    ('html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'pdf'),
     'preview': ('png', 'jpg', 'jpeg', 'svg'),
     # Word embeds raster only — DOCX lacks native PDF/SVG support.

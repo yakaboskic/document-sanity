@@ -144,19 +144,33 @@ def _convert_inline(text: str, escape: bool = True) -> str:
     # \href{url}{text}: protect just the url arg, text arg goes through normal processing
     text = re.sub(r'\\href\{[^}]*\}', protect_cmd, text)
 
-    # Inline code `...` -> \texttt{...}, converting inside the protection so that
-    # the special chars inside code don't get mangled by subsequent escaping.
-    # Match single backtick pairs only (not LaTeX-style ``quotes'').
-    # Preserve already-escaped sequences (\_, \{, \&, etc.) and only escape raw chars.
+    # Inline code `...` -> \texttt{...}. The contents must render as literal
+    # characters in the output, so we fully escape every LaTeX-active char
+    # (including \, {, } that earlier passes left alone). We also restore any
+    # variable/math placeholders that fell inside the backticks BEFORE
+    # escaping, so e.g. `{{fig:x}}` ends up as \texttt{\{\{fig:x\}\}} and the
+    # downstream variable processor leaves it alone.
     def protect_code(m):
         key = f'\x00CMD{counter[0]}\x00'
         inner = m.group(1)
-        # Escape only unescaped special chars (negative lookbehind for \)
-        inner = re.sub(r'(?<!\\)_', r'\\_', inner)
-        inner = re.sub(r'(?<!\\)&', r'\\&', inner)
-        inner = re.sub(r'(?<!\\)#', r'\\#', inner)
-        inner = re.sub(r'(?<!\\)%', r'\\%', inner)
-        inner = re.sub(r'(?<!\\)\$', r'\\$', inner)
+        # Restore any placeholders that fell inside the backticks so we can
+        # see and escape the literal source.
+        for pkey, pval in placeholders.items():
+            inner = inner.replace(pkey, pval)
+        for pkey, pval in math_placeholders.items():
+            inner = inner.replace(pkey, pval)
+        # Full LaTeX escape — order matters: backslash first so we don't
+        # double-escape the replacements we add below.
+        inner = inner.replace('\\', '\\textbackslash{}')
+        inner = inner.replace('{', '\\{')
+        inner = inner.replace('}', '\\}')
+        inner = inner.replace('&', '\\&')
+        inner = inner.replace('%', '\\%')
+        inner = inner.replace('$', '\\$')
+        inner = inner.replace('#', '\\#')
+        inner = inner.replace('_', '\\_')
+        inner = inner.replace('~', '\\textasciitilde{}')
+        inner = inner.replace('^', '\\textasciicircum{}')
         cmd_placeholders[key] = '\\texttt{' + inner + '}'
         counter[0] += 1
         return key
@@ -260,6 +274,14 @@ def _convert_table(lines: list[str]) -> str:
     return '\n'.join(out)
 
 
+def _is_fence_closer(line: str) -> bool:
+    """A code-fence closer is a line of only backticks (CommonMark: closer
+    must not have an info string). This prevents a second ```latex line —
+    which the author may have intended as another opener — from being
+    misread as the close of the first fence."""
+    return bool(re.match(r'^\s*```+\s*$', line))
+
+
 _PREVIEW_BLOCK_RE = re.compile(
     r'<!--\s*(?:document-sanity|latex-builder):preview:begin[^>]*-->'
     r'.*?<!--\s*(?:document-sanity|latex-builder):preview:end\s*-->\s*',
@@ -324,7 +346,7 @@ def md_to_latex(
         if stripped.startswith('```latex'):
             i += 1
             latex_block = []
-            while i < len(lines) and not lines[i].strip().startswith('```'):
+            while i < len(lines) and not _is_fence_closer(lines[i]):
                 latex_block.append(lines[i])
                 i += 1
             i += 1  # skip closing ```
@@ -332,18 +354,20 @@ def md_to_latex(
             continue
 
         # Code block: ``` ... ```
+        # The info string (e.g. ```markdown) is intentionally dropped. The
+        # listings package only knows a fixed set of languages, the default
+        # template doesn't configure highlighting, and emitting
+        # `language=markdown` (or any other unknown lang) is a hard pdflatex
+        # error. Verbatim monospaced output is the right default; users who
+        # want highlighting can \lstdefinelanguage{} in their template.
         if stripped.startswith('```'):
-            lang = stripped[3:].strip()
             i += 1
             code_lines = []
-            while i < len(lines) and not lines[i].strip().startswith('```'):
+            while i < len(lines) and not _is_fence_closer(lines[i]):
                 code_lines.append(lines[i])
                 i += 1
             i += 1  # skip closing ```
-            if lang:
-                output.append(f'\\begin{{lstlisting}}[language={lang}]')
-            else:
-                output.append('\\begin{lstlisting}')
+            output.append('\\begin{lstlisting}')
             output.extend(code_lines)
             output.append('\\end{lstlisting}')
             continue
