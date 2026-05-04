@@ -154,14 +154,24 @@ def _convert_inline(text: str, escape: bool = True) -> str:
         key = f'\x00CMD{counter[0]}\x00'
         inner = m.group(1)
         # Restore any placeholders that fell inside the backticks so we can
-        # see and escape the literal source.
+        # see and escape the literal source. cmd_placeholders is included
+        # because earlier passes already protected things like \cite{key}
+        # and \ref{...} — without restoring them here, they'd survive the
+        # backtick wrapper unescaped and pdflatex would still try to resolve
+        # them. NOTE: cmd_placeholders may grow during this pass; iterate a
+        # snapshot of the current keys.
         for pkey, pval in placeholders.items():
             inner = inner.replace(pkey, pval)
         for pkey, pval in math_placeholders.items():
             inner = inner.replace(pkey, pval)
-        # Full LaTeX escape — order matters: backslash first so we don't
-        # double-escape the replacements we add below.
-        inner = inner.replace('\\', '\\textbackslash{}')
+        for pkey, pval in list(cmd_placeholders.items()):
+            inner = inner.replace(pkey, pval)
+        # Full LaTeX escape. Backslash needs special handling: the
+        # replacement \textbackslash{} contains \, {, and } itself, so we
+        # park backslashes on a sentinel, escape the braces, then expand
+        # the sentinel — otherwise the brace pass mangles the command.
+        bs_sentinel = '\x00BS\x00'
+        inner = inner.replace('\\', bs_sentinel)
         inner = inner.replace('{', '\\{')
         inner = inner.replace('}', '\\}')
         inner = inner.replace('&', '\\&')
@@ -171,6 +181,7 @@ def _convert_inline(text: str, escape: bool = True) -> str:
         inner = inner.replace('_', '\\_')
         inner = inner.replace('~', '\\textasciitilde{}')
         inner = inner.replace('^', '\\textasciicircum{}')
+        inner = inner.replace(bs_sentinel, '\\textbackslash{}')
         cmd_placeholders[key] = '\\texttt{' + inner + '}'
         counter[0] += 1
         return key
