@@ -230,8 +230,15 @@ class ManuscriptBuilder:
         print(f"\n  Assembling main.tex...")
 
         template = self._resolve_template()
-        title_block = self._build_title_block()
-        abstract_block = self._build_abstract_block()
+        # Honor manifest.metadata.render: when False, leave the
+        # %%DOCUMENT_SANITY:TITLE / :ABSTRACT insertion points empty so
+        # the template's own front matter (or none) takes effect.
+        if self.manifest.metadata.render:
+            title_block = self._build_title_block()
+            abstract_block = self._build_abstract_block()
+        else:
+            title_block = ''
+            abstract_block = ''
 
         # Resolve bibliography
         bib_cmd = ''

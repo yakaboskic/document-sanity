@@ -618,17 +618,13 @@ INDEX_TEMPLATE = """<!doctype html>
   hr {{ border: 0; border-top: 1px solid hsl(var(--border)); margin: 2rem 0; }}
   iframe {{ background: white; }}
 </style>
+{custom_css_link}
 </head>
 <body>
   <div class="layout">
     {toc_html}
     <div class="content">
-      <header class="paper-header">
-        <div id="top" class="paper-title">{title}</div>
-        {authors_html}
-        {affiliations_html}
-      </header>
-
+      {paper_header_html}
       {abstract_html}
 
       <main>
@@ -998,12 +994,24 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
         if verbose:
             print(f'    Rendered: {section_ref}')
 
-    # Abstract (if present), rendered as an inline markdown snippet
+    # Abstract + paper header — both gated on manifest.metadata.render so
+    # proposal-style docs can skip the auto-rendered front matter and start
+    # directly with sections.
     abstract_html = ''
-    if manifest.metadata.abstract:
-        abs_body = md_to_html(manifest.metadata.abstract, resolve,
-                              resolve_citation=citations.resolve)
-        abstract_html = f'<aside class="abstract"><h2>Abstract</h2>{abs_body}</aside>'
+    paper_header_html = ''
+    if manifest.metadata.render:
+        if manifest.metadata.abstract:
+            abs_body = md_to_html(manifest.metadata.abstract, resolve,
+                                  resolve_citation=citations.resolve)
+            abstract_html = f'<aside class="abstract"><h2>Abstract</h2>{abs_body}</aside>'
+        title_text = manifest.metadata.title or 'Manuscript'
+        paper_header_html = (
+            f'<header class="paper-header">'
+            f'<div id="top" class="paper-title">{title_text}</div>'
+            f'{_render_authors_html(manifest)}'
+            f'{_render_affiliations_html(manifest)}'
+            f'</header>'
+        )
 
     # Bibliography section — appended after all cited sections so numbering
     # reflects first-appearance order (matches natbib unsrt convention).
@@ -1017,14 +1025,33 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     toc = _extract_toc(sections_joined)
     toc_html = _render_toc_html(toc)
 
+    # Custom CSS via manifest.metadata.html_styles. Bare names resolve to
+    # styles/<name>.css; explicit paths (with .css extension) are taken
+    # as-is. The file is copied next to index.html and linked via <link>
+    # after the built-in <style> so user rules win on cascade tie.
+    custom_css_link = ''
+    custom_css_src: Optional[Path] = None
+    if manifest.metadata.html_styles:
+        ref = manifest.metadata.html_styles
+        p = Path(ref)
+        if p.suffix.lower() == '.css':
+            cand = p if p.is_absolute() else (root_dir / p)
+        else:
+            cand = root_dir / 'styles' / f'{ref}.css'
+        if cand.exists():
+            custom_css_src = cand
+        else:
+            print(f'  WARNING: html_styles CSS not found: {cand}')
+
     html = INDEX_TEMPLATE.format(
         title=title,
-        authors_html=_render_authors_html(manifest),
-        affiliations_html=_render_affiliations_html(manifest),
+        paper_header_html=paper_header_html,
         abstract_html=abstract_html,
         sections_html=sections_joined,
         toc_html=toc_html,
         katex_macros_json=json.dumps(katex_macros),
+        custom_css_link=(f'<link rel="stylesheet" href="{custom_css_src.name}"/>'
+                         if custom_css_src else ''),
     )
 
     # Write output
@@ -1032,6 +1059,10 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     html_dir.mkdir(parents=True, exist_ok=True)
     index_path = html_dir / 'index.html'
     index_path.write_text(html, encoding='utf-8')
+
+    if custom_css_src:
+        import shutil
+        shutil.copy2(custom_css_src, html_dir / custom_css_src.name)
 
     # Copy figures so <img>/<iframe> paths resolve. The copy plan flattens
     # subdirectories (figures/foo/foo.png → figures/foo.png) and crop_with_copy

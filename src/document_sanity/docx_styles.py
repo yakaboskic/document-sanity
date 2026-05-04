@@ -126,16 +126,32 @@ def default_styles() -> dict[str, Any]:
     return copy.deepcopy(DEFAULT_STYLES)
 
 
+def _is_yaml_path(path: Path | str) -> bool:
+    return str(path).lower().endswith((".yaml", ".yml"))
+
+
 def load_styles(path: Path | str) -> dict[str, Any]:
-    """Load a styles JSON file. Missing keys fall back to defaults via merge."""
+    """Load a styles file (.json or .yaml). Missing keys fall back to defaults
+    via merge."""
     with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+        if _is_yaml_path(path):
+            import yaml  # pyyaml is already a runtime dep
+            data = yaml.safe_load(f) or {}
+        else:
+            data = json.load(f)
     return _deep_merge(default_styles(), data)
 
 
 def save_styles(path: Path | str, styles: dict[str, Any]) -> None:
+    """Write the styles dict. Format chosen by file extension: .yaml/.yml
+    -> YAML (more diff-friendly for editing as a source of truth), .json
+    or anything else -> JSON."""
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(styles, f, indent=2)
+        if _is_yaml_path(path):
+            import yaml
+            yaml.safe_dump(styles, f, sort_keys=False, default_flow_style=False)
+        else:
+            json.dump(styles, f, indent=2)
 
 
 def _deep_merge(base: dict, override: dict) -> dict:

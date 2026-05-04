@@ -104,13 +104,39 @@ class WordBuilder:
         )
 
     def _resolve_styles(self, template_path: Path) -> dict[str, Any]:
+        # Precedence: explicit --styles override > manifest word_styles >
+        # extracted from template > defaults. Manifest word_styles accepts
+        # either a bare name (resolved to styles/<name>.yaml then .json)
+        # or an explicit path with extension.
         if self.styles_override:
             return load_styles(self.styles_override)
+
+        word_styles = self.manifest.metadata.word_styles
+        if word_styles:
+            styles_path = self._resolve_styles_path(word_styles)
+            if styles_path and styles_path.exists():
+                return load_styles(styles_path)
+            print(f"  WARNING: word_styles '{word_styles}' not found, falling back to template extraction")
+
         try:
             return extract_styles(template_path)
         except Exception as e:
             print(f"  WARNING: extracting styles from {template_path} failed: {e}")
             return default_styles()
+
+    def _resolve_styles_path(self, ref: str) -> Optional[Path]:
+        """Resolve a manifest styles reference to a concrete file path.
+        Bare names look in styles/<name>.{yaml,yml,json}; extensioned
+        paths are taken as-is relative to root_dir or as absolute."""
+        styles_dir = self.root_dir / "styles"
+        p = Path(ref)
+        if p.suffix.lower() in (".yaml", ".yml", ".json"):
+            return p if p.is_absolute() else (self.root_dir / p)
+        for ext in (".yaml", ".yml", ".json"):
+            candidate = styles_dir / f"{ref}{ext}"
+            if candidate.exists():
+                return candidate
+        return None
 
     def _resolve_figure(self, fig_id: str) -> Optional[Path]:
         entry = self.manifest.figures.get(fig_id)
@@ -273,14 +299,25 @@ class WordBuilder:
             title=self.manifest.metadata.title,
             author=", ".join(a.name for a in self.manifest.metadata.authors) or None,
         ))
-        self._add_title_block(doc)
-        self._add_abstract(doc)
+        if self.manifest.metadata.render:
+            self._add_title_block(doc)
+            self._add_abstract(doc)
+        else:
+            print("  Skipping title/abstract block (manifest.metadata.render: false)")
 
         print("\n  Rendering sections...")
         self._render_sections(doc)
 
         # Save
         doc.save(self.out_docx)
+
+        # Also emit the resolved styles dict alongside as a source of truth
+        # the user can copy to styles/<name>.yaml, edit, and feed back via
+        # manifest.metadata.word_styles.
+        from .docx_styles import save_styles
+        styles_yaml = self.out_dir / "styles.yaml"
+        save_styles(styles_yaml, styles)
+        print(f"  Styles: {styles_yaml}")
 
         # Report
         self.processor.print_report(verbose=self.verbose)

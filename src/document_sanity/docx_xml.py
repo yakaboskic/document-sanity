@@ -41,6 +41,7 @@ class RichText:
     color: Optional[str] = None
     font: Optional[str] = None
     size: Optional[int] = None
+    rstyle: Optional[str] = None  # character-style id (e.g. "Code")
 
 
 def _pick(*vals):
@@ -58,8 +59,13 @@ def create_run_props(
     color: Optional[str] = None,
     bold: Optional[bool] = None,
     italic: Optional[bool] = None,
+    rstyle: Optional[str] = None,
 ) -> str:
     parts: list[str] = []
+    # rStyle goes first per OOXML schema order so Word resolves the
+    # character style before applying any direct overrides on this run.
+    if rstyle:
+        parts.append(f'<w:rStyle w:val="{rstyle}"/>')
     if font:
         parts.append(f'<w:rFonts w:ascii="{font}" w:hAnsi="{font}"/>')
     if size:
@@ -153,6 +159,7 @@ def create_paragraph(
                     color=_pick(part.color, color),
                     bold=_pick(part.bold, bold),
                     italic=_pick(part.italic, italic),
+                    rstyle=part.rstyle,
                 )
             )
         runs = "".join(parts)

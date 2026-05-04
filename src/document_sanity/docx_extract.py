@@ -213,7 +213,13 @@ def extract_styles(template_path: Path | str) -> dict[str, Any]:
     normal = resolve("Normal", "Normal")
 
     colors = styles["colors"]
-    if theme_colors.get("accent1"):
+    # Prefer the Title style's explicit color over the theme's accent1.
+    # An author who set Title to a brand color expects that color to drive
+    # primary/heading colors throughout the build, not be silently shadowed
+    # by whatever the theme defines.
+    if title and title.color:
+        colors["primary"] = title.color
+    elif theme_colors.get("accent1"):
         colors["primary"] = theme_colors["accent1"]
     if theme_colors.get("accent2"):
         colors["secondary"] = theme_colors["accent2"]

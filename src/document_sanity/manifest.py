@@ -215,6 +215,18 @@ class Metadata:
     keywords: list[str] = field(default_factory=list)
     template: str = "article"
     word_template: Optional[str] = None   # .docx template stem (optional)
+    # Style overrides — bare names resolve to styles/<name>.yaml or
+    # styles/<name>.css, parallel to template:/word_template:. A path
+    # ending in .yaml/.yml/.json/.css is taken as-is (relative to project
+    # root, or absolute).
+    word_styles: Optional[str] = None
+    html_styles: Optional[str] = None
+    # When False, builders skip the auto-rendered title/authors/
+    # affiliations/abstract/keywords block and start directly with
+    # sections. Useful for proposals or document types where the
+    # template handles its own front matter. Manifest fields are still
+    # populated and available for variable substitution.
+    render: bool = True
     document_class: Optional[str] = None
 
 
@@ -273,6 +285,9 @@ class Manifest:
             keywords=raw.get('keywords', []),
             template=raw.get('template', 'article'),
             word_template=raw.get('word_template'),
+            word_styles=raw.get('word_styles'),
+            html_styles=raw.get('html_styles'),
+            render=raw.get('render', True),
             document_class=raw.get('document_class'),
         )
 

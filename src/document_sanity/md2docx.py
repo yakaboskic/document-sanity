@@ -429,7 +429,11 @@ def _tokenize_inline(text: str) -> list[RichText]:
     while i < n:
         ch = text[i]
 
-        # Backtick-delimited code span.
+        # Backtick-delimited code span. Apply the template's "Code"
+        # character style (rStyle) so the template author's choice of mono
+        # font, color, and size propagates here. We also set the mono font
+        # explicitly as a safety net in case the template doesn't define a
+        # Code character style.
         if ch == "`":
             flush()
             j = text.find("`", i + 1)
@@ -437,11 +441,16 @@ def _tokenize_inline(text: str) -> list[RichText]:
                 buf.append(ch)
                 i += 1
                 continue
-            runs.append(RichText(text=text[i + 1 : j]))  # plain text, no mono
-            # Note: changing the font here would require threading the mono
-            # font through; runs emitted via ContentBuilder.p() inherit body
-            # font. Visually distinct inline-code requires a per-run font
-            # override, which we approximate by leaving styling unchanged.
+            mono = None
+            try:
+                mono = ctx.builder.styles.get("fonts", {}).get("mono")
+            except AttributeError:
+                pass
+            runs.append(RichText(
+                text=text[i + 1 : j],
+                rstyle="Code",
+                font=mono,
+            ))
             i = j + 1
             continue
 

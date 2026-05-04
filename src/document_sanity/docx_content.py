@@ -72,6 +72,7 @@ class ContentBuilder:
         s = self.styles
         self._items.append(create_paragraph(
             text,
+            style="Title",
             alignment=_or_(o.alignment, "center"),
             font=_or_(o.font, s["fonts"]["heading"]),
             size=_or_(o.size, s["fontSizes"]["title"]),
