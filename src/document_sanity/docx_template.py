@@ -113,11 +113,16 @@ class TemplateDocument:
             last_sect = sect_prs[-1]
             second_last_sect = sect_prs[-2]
             cut_pos = second_last_sect.end()
-            # Advance past any closing </w:pPr></w:p> that wraps this sectPr.
+            # The sectPr lives inside a parent <w:p>. After </w:sectPr> the
+            # template may have </w:pPr>, then bookmarks / runs / etc., before
+            # the matching </w:p> that closes the paragraph. We must include
+            # everything up to and including that </w:p> in the prefix —
+            # otherwise the inserted content gets nested inside an unclosed
+            # paragraph and the resulting XML is invalid.
             tail = existing[cut_pos:]
-            close_match = re.match(r"\s*(?:</w:pPr>\s*)?(?:</w:p>)?", tail)
-            if close_match:
-                cut_pos += close_match.end()
+            p_close = tail.find("</w:p>")
+            if p_close != -1:
+                cut_pos += p_close + len("</w:p>")
             prefix = existing[:cut_pos]
             final_sect_pr = last_sect.group(0)
             new_body = (
