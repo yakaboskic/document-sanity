@@ -273,12 +273,20 @@ def _convert_table(lines: list[str], escape: bool = True) -> str:
         cells = [c.strip() for c in line.strip('|').split('|')]
         rows.append(cells)
 
-    # Build LaTeX
-    col_spec = '|' + '|'.join(['l'] * n_cols) + '|'
+    # Use tabularx so tables auto-fit \textwidth and wrap long cells.
+    # All columns get X (equal share of remaining width); requires
+    # \usepackage{tabularx} in the template — both article.tex and
+    # proposal.tex include it. >{\raggedright\arraybackslash} makes X
+    # columns left-aligned without weird justification artifacts on
+    # narrow widths.
+    col_spec = '|' + '|'.join(
+        ['>{\\raggedright\\arraybackslash}X'] * n_cols
+    ) + '|'
     out = []
     out.append('\\begin{table}[htbp]')
     out.append('\\centering')
-    out.append(f'\\begin{{tabular}}{{{col_spec}}}')
+    out.append('\\small')
+    out.append(f'\\begin{{tabularx}}{{\\textwidth}}{{{col_spec}}}')
     out.append('\\hline')
     out.append(' & '.join(f'\\textbf{{{_convert_inline(h, escape=escape)}}}' for h in header) + ' \\\\')
     out.append('\\hline')
@@ -288,7 +296,7 @@ def _convert_table(lines: list[str], escape: bool = True) -> str:
             row.append('')
         out.append(' & '.join(_convert_inline(c, escape=escape) for c in row[:n_cols]) + ' \\\\')
     out.append('\\hline')
-    out.append('\\end{tabular}')
+    out.append('\\end{tabularx}')
     out.append('\\end{table}')
 
     return '\n'.join(out)
