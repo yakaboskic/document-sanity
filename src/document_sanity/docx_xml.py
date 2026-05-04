@@ -42,6 +42,7 @@ class RichText:
     font: Optional[str] = None
     size: Optional[int] = None
     rstyle: Optional[str] = None  # character-style id (e.g. "Code")
+    vert_align: Optional[str] = None  # "superscript" | "subscript"
 
 
 def _pick(*vals):
@@ -60,6 +61,7 @@ def create_run_props(
     bold: Optional[bool] = None,
     italic: Optional[bool] = None,
     rstyle: Optional[str] = None,
+    vert_align: Optional[str] = None,
 ) -> str:
     parts: list[str] = []
     # rStyle goes first per OOXML schema order so Word resolves the
@@ -76,6 +78,8 @@ def create_run_props(
         parts.append("<w:b/>")
     if italic:
         parts.append("<w:i/>")
+    if vert_align in ("superscript", "subscript"):
+        parts.append(f'<w:vertAlign w:val="{vert_align}"/>')
     if not parts:
         return ""
     return f"<w:rPr>{''.join(parts)}</w:rPr>"
@@ -160,6 +164,7 @@ def create_paragraph(
                     bold=_pick(part.bold, bold),
                     italic=_pick(part.italic, italic),
                     rstyle=part.rstyle,
+                    vert_align=part.vert_align,
                 )
             )
         runs = "".join(parts)

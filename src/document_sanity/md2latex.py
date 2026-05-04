@@ -236,6 +236,12 @@ def _convert_inline(text: str, escape: bool = True) -> str:
     # Italic: *text* -> \textit{text}
     text = re.sub(r'\*(.+?)\*', r'\\textit{\1}', text)
 
+    # <sup>x</sup> / <sub>x</sub> — write these in markdown for portable
+    # superscripts/subscripts; LaTeX gets \textsuperscript{}, HTML keeps
+    # the tags natively, and Word emits a w:vertAlign run.
+    text = re.sub(r'<sup>(.+?)</sup>', r'\\textsuperscript{\1}', text, flags=re.IGNORECASE)
+    text = re.sub(r'<sub>(.+?)</sub>', r'\\textsubscript{\1}', text, flags=re.IGNORECASE)
+
     # Restore protected content (iterate to handle nesting)
     for _pass in range(3):
         for key, val in placeholders.items():
@@ -248,8 +254,11 @@ def _convert_inline(text: str, escape: bool = True) -> str:
     return text
 
 
-def _convert_table(lines: list[str]) -> str:
-    """Convert a markdown table to LaTeX tabular."""
+def _convert_table(lines: list[str], escape: bool = True) -> str:
+    """Convert a markdown table to LaTeX tabular. The `escape` flag is
+    threaded into per-cell inline conversion so callers that pass
+    escape_text=False (manuscript prose with raw LaTeX like
+    R\\textsuperscript{2}) preserve their LaTeX commands inside cells."""
     if len(lines) < 2:
         return '\n'.join(lines)
 
@@ -271,13 +280,13 @@ def _convert_table(lines: list[str]) -> str:
     out.append('\\centering')
     out.append(f'\\begin{{tabular}}{{{col_spec}}}')
     out.append('\\hline')
-    out.append(' & '.join(f'\\textbf{{{_convert_inline(h)}}}' for h in header) + ' \\\\')
+    out.append(' & '.join(f'\\textbf{{{_convert_inline(h, escape=escape)}}}' for h in header) + ' \\\\')
     out.append('\\hline')
     for row in rows:
         # Pad row if needed
         while len(row) < n_cols:
             row.append('')
-        out.append(' & '.join(_convert_inline(c) for c in row[:n_cols]) + ' \\\\')
+        out.append(' & '.join(_convert_inline(c, escape=escape) for c in row[:n_cols]) + ' \\\\')
     out.append('\\hline')
     out.append('\\end{tabular}')
     out.append('\\end{table}')

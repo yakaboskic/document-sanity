@@ -426,8 +426,47 @@ def _tokenize_inline(text: str) -> list[RichText]:
         ))
         buf.clear()
 
+    # Pre-process super/subscript markers — both <sup>X</sup> /
+    # <sub>X</sub> (the portable form) and \textsuperscript{X} /
+    # \textsubscript{X} (LaTeX-native source). Replace with sentinel
+    # markers we can detect during the inline scan below, since the
+    # tokenizer otherwise has no notion of nested runs.
+    SUP_OPEN, SUP_CLOSE = "\x01SUP\x01", "\x01/SUP\x01"
+    SUB_OPEN, SUB_CLOSE = "\x01SUB\x01", "\x01/SUB\x01"
+    text = re.sub(r'<sup>(.+?)</sup>', lambda m: f'{SUP_OPEN}{m.group(1)}{SUP_CLOSE}', text, flags=re.IGNORECASE)
+    text = re.sub(r'<sub>(.+?)</sub>', lambda m: f'{SUB_OPEN}{m.group(1)}{SUB_CLOSE}', text, flags=re.IGNORECASE)
+    text = re.sub(r'\\textsuperscript\{([^{}]*)\}', lambda m: f'{SUP_OPEN}{m.group(1)}{SUP_CLOSE}', text)
+    text = re.sub(r'\\textsubscript\{([^{}]*)\}', lambda m: f'{SUB_OPEN}{m.group(1)}{SUB_CLOSE}', text)
+    n = len(text)
+
     while i < n:
         ch = text[i]
+
+        # Super/subscript sentinels emitted by the pre-pass above.
+        if text.startswith(SUP_OPEN, i):
+            flush()
+            j = text.find(SUP_CLOSE, i + len(SUP_OPEN))
+            if j != -1:
+                runs.append(RichText(
+                    text=text[i + len(SUP_OPEN) : j],
+                    vert_align="superscript",
+                    bold=True if active_bold else None,
+                    italic=True if active_italic else None,
+                ))
+                i = j + len(SUP_CLOSE)
+                continue
+        if text.startswith(SUB_OPEN, i):
+            flush()
+            j = text.find(SUB_CLOSE, i + len(SUB_OPEN))
+            if j != -1:
+                runs.append(RichText(
+                    text=text[i + len(SUB_OPEN) : j],
+                    vert_align="subscript",
+                    bold=True if active_bold else None,
+                    italic=True if active_italic else None,
+                ))
+                i = j + len(SUB_CLOSE)
+                continue
 
         # Backtick-delimited code span. Apply the template's "Code"
         # character style (rStyle) so the template author's choice of

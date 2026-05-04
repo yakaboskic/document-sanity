@@ -262,6 +262,25 @@ def _convert_inline(text: str,
     # \underline{X} -> just X (no HTML equivalent without changing semantics)
     text = re.sub(r'\\underline\{([^{}]*)\}', r'\1', text)
 
+    # \textsuperscript{X} / \textsubscript{X} (from LaTeX-native sources)
+    # AND <sup>X</sup> / <sub>X</sub> (the portable markdown form). Both
+    # land as <sup>/<sub> in HTML; protect via the placeholder store so
+    # the angle brackets aren't HTML-escaped in step 5.
+    def _sup(m: re.Match) -> str:
+        key = f'\x00T{counter[0]}\x00'
+        store[key] = f'<sup>{_escape(m.group(1))}</sup>'
+        counter[0] += 1
+        return key
+    def _sub(m: re.Match) -> str:
+        key = f'\x00T{counter[0]}\x00'
+        store[key] = f'<sub>{_escape(m.group(1))}</sub>'
+        counter[0] += 1
+        return key
+    text = re.sub(r'\\textsuperscript\{([^{}]*)\}', _sup, text)
+    text = re.sub(r'\\textsubscript\{([^{}]*)\}', _sub, text)
+    text = re.sub(r'<sup>(.+?)</sup>', _sup, text, flags=re.IGNORECASE)
+    text = re.sub(r'<sub>(.+?)</sub>', _sub, text, flags=re.IGNORECASE)
+
     # 5. Now escape the remaining prose. Strip LaTeX escape sequences
     # (\_, \&, \%, \#, \$, \{, \}) first — they're LaTeX-only artifacts and
     # should display as the literal character in HTML.
