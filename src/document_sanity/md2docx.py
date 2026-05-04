@@ -230,14 +230,13 @@ def _render_table(block_lines: list[str], ctx: RenderContext) -> None:
 
     headers = _split_cells(block_lines[0])
     body_rows = [_split_cells(r) for r in block_lines[2:]]
-    # For tables we flatten inline formatting to plain text (OOXML tables want
-    # simple strings per cell in our helper; inline runs per cell would require
-    # a bigger createTable rewrite).
-    flat_headers = [_rich_to_text(_inline_to_rich(h, ctx)) for h in headers]
-    flat_rows = [
-        [_rich_to_text(_inline_to_rich(c, ctx)) for c in row] for row in body_rows
-    ]
-    ctx.builder.table(flat_headers, flat_rows)
+    # Pass list[RichText] per cell so create_table can emit one <w:r>
+    # per run, preserving sup/sub/bold/italic/code formatting inside
+    # cells. (Was previously flattened to plain text via _rich_to_text,
+    # which dropped R<sup>2</sup> formatting in the rendered table.)
+    rich_headers = [_inline_to_rich(h, ctx) for h in headers]
+    rich_rows = [[_inline_to_rich(c, ctx) for c in row] for row in body_rows]
+    ctx.builder.table(rich_headers, rich_rows)
 
 
 def _render_latex_block(body: str, ctx: RenderContext) -> None:

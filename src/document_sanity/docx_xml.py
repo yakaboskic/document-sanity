@@ -181,29 +181,58 @@ def create_page_break() -> str:
 
 # ---- tables ----------------------------------------------------------------
 
+CellContent = Any  # str | list[RichText] — declared for clarity below
+
+
 def create_table(
-    headers: list[str],
-    rows: list[list[str]],
+    headers: list[CellContent],
+    rows: list[list[CellContent]],
     styles: dict[str, Any],
     style_name: str = "default",
 ) -> str:
+    """Render a table. Cells may be plain strings (single-run, table-style
+    formatting only) OR a list[RichText] (one <w:r> per RichText, with
+    table-style attributes used as defaults the run can override).
+
+    Passing list[RichText] is what lets superscript / subscript / bold /
+    italic / inline code formatting survive in table cells, since each
+    cell ends up with multiple runs each carrying its own rPr."""
     tbl_style = styles["tableStyles"][style_name]
 
-    header_rpr = (
-        f'<w:rFonts w:ascii="{tbl_style["headerFont"]}" w:hAnsi="{tbl_style["headerFont"]}"/>'
-        f'<w:sz w:val="{tbl_style["headerSize"]}"/><w:szCs w:val="{tbl_style["headerSize"]}"/>'
-        f'<w:color w:val="{tbl_style["headerTextColor"]}"/>'
-        + ("<w:b/>" if tbl_style["headerBold"] else "")
-    )
-    body_rpr = (
-        f'<w:rFonts w:ascii="{tbl_style["bodyFont"]}" w:hAnsi="{tbl_style["bodyFont"]}"/>'
-        f'<w:sz w:val="{tbl_style["bodySize"]}"/><w:szCs w:val="{tbl_style["bodySize"]}"/>'
-        f'<w:color w:val="{tbl_style["bodyTextColor"]}"/>'
-    )
+    header_font = tbl_style["headerFont"]
+    header_size = int(tbl_style["headerSize"])
+    header_color = tbl_style["headerTextColor"]
+    header_bold = bool(tbl_style["headerBold"])
+    body_font = tbl_style["bodyFont"]
+    body_size = int(tbl_style["bodySize"])
+    body_color = tbl_style["bodyTextColor"]
+
+    def _runs_for_cell(cell: CellContent, *, is_header: bool) -> str:
+        font = header_font if is_header else body_font
+        size = header_size if is_header else body_size
+        color = header_color if is_header else body_color
+        bold = header_bold if is_header else None
+        if isinstance(cell, str):
+            return create_run(cell, font=font, size=size, color=color, bold=bold)
+        # list[RichText] — emit one run per part, with table defaults
+        # filled in for any unset attribute.
+        parts: list[str] = []
+        for rt in cell:
+            parts.append(create_run(
+                rt.text,
+                font=_pick(rt.font, font),
+                size=_pick(rt.size, size),
+                color=_pick(rt.color, color),
+                bold=_pick(rt.bold, bold),
+                italic=rt.italic,
+                rstyle=rt.rstyle,
+                vert_align=rt.vert_align,
+            ))
+        return "".join(parts)
 
     header_cells = "".join(
         f'<w:tc><w:tcPr><w:shd w:val="clear" w:fill="{tbl_style["headerBackground"]}"/></w:tcPr>'
-        f'<w:p><w:r><w:rPr>{header_rpr}</w:rPr><w:t>{escape_xml(h)}</w:t></w:r></w:p></w:tc>'
+        f'<w:p>{_runs_for_cell(h, is_header=True)}</w:p></w:tc>'
         for h in headers
     )
     header_row = f"<w:tr>{header_cells}</w:tr>"
@@ -213,7 +242,7 @@ def create_table(
         fill = tbl_style["rowEven"] if idx % 2 == 0 else tbl_style["rowOdd"]
         cells = "".join(
             f'<w:tc><w:tcPr><w:shd w:val="clear" w:fill="{fill}"/></w:tcPr>'
-            f'<w:p><w:r><w:rPr>{body_rpr}</w:rPr><w:t>{escape_xml(cell)}</w:t></w:r></w:p></w:tc>'
+            f'<w:p>{_runs_for_cell(cell, is_header=False)}</w:p></w:tc>'
             for cell in row
         )
         data_rows_parts.append(f"<w:tr>{cells}</w:tr>")
