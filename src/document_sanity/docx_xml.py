@@ -63,21 +63,25 @@ def create_run_props(
     rstyle: Optional[str] = None,
     vert_align: Optional[str] = None,
 ) -> str:
+    # OOXML EG_RPrBase has a strict child-element order. Out-of-order
+    # properties are silently dropped by some renderers (notably Word on
+    # macOS) — that's why a previous emit order put vertAlign last but
+    # also put color after sz, which broke superscript runs entirely.
+    # Canonical order for the props we emit:
+    #   rStyle, rFonts, b, i, color, sz, szCs, vertAlign
     parts: list[str] = []
-    # rStyle goes first per OOXML schema order so Word resolves the
-    # character style before applying any direct overrides on this run.
     if rstyle:
         parts.append(f'<w:rStyle w:val="{rstyle}"/>')
     if font:
         parts.append(f'<w:rFonts w:ascii="{font}" w:hAnsi="{font}"/>')
-    if size:
-        parts.append(f'<w:sz w:val="{size}"/><w:szCs w:val="{size}"/>')
-    if color:
-        parts.append(f'<w:color w:val="{color}"/>')
     if bold:
         parts.append("<w:b/>")
     if italic:
         parts.append("<w:i/>")
+    if color:
+        parts.append(f'<w:color w:val="{color}"/>')
+    if size:
+        parts.append(f'<w:sz w:val="{size}"/><w:szCs w:val="{size}"/>')
     if vert_align in ("superscript", "subscript"):
         parts.append(f'<w:vertAlign w:val="{vert_align}"/>')
     if not parts:
