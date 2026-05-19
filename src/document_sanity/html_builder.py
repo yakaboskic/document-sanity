@@ -392,12 +392,11 @@ INDEX_TEMPLATE = """<!doctype html>
      iframe to match. 420px is a reasonable fallback while the message is
      in flight. */
   iframe.interactive-fig {{
-    display: block; width: 100%;
-    height: 420px;
+    display: block; 
+    width: 100%;
     border: 1px solid hsl(var(--border));
     border-radius: .5rem;
     background: white;
-    overflow: hidden;
     transition: height .2s ease-out;
   }}
 
@@ -618,13 +617,17 @@ INDEX_TEMPLATE = """<!doctype html>
   hr {{ border: 0; border-top: 1px solid hsl(var(--border)); margin: 2rem 0; }}
   iframe {{ background: white; }}
 </style>
-{custom_css_link}
 </head>
 <body>
   <div class="layout">
     {toc_html}
     <div class="content">
-      {paper_header_html}
+      <header class="paper-header">
+        <div id="top" class="paper-title">{title}</div>
+        {authors_html}
+        {affiliations_html}
+      </header>
+
       {abstract_html}
 
       <main>
@@ -777,13 +780,17 @@ INDEX_TEMPLATE = """<!doctype html>
     window.addEventListener("message", (e) => {{
       if (!e || !e.data || typeof e.data.latexBuilderFigureHeight !== "number") return;
       const h = e.data.latexBuilderFigureHeight;
-      // Cap at 90vh so a rogue figure can't take over the viewport.
-      const cap = Math.round(window.innerHeight * 0.9);
-      const clamped = Math.min(h, cap);
+      
       document.querySelectorAll("iframe.interactive-fig").forEach(iframe => {{
         if (iframe.contentWindow === e.source) {{
-          iframe.style.height = clamped + "px";
-        }}
+          // Get the current height of the iframe
+          const currentHeight = parseInt(iframe.style.height) || 0;
+          
+          // Circuit breaker: Only resize if the difference is greater than 5 pixels.
+          // This prevents infinite loops caused by minor fractional pixel adjustments.
+          if (Math.abs(currentHeight - h) > 5) {{
+            iframe.style.height = h + "px"
+        }}}}
       }});
     }});
 
@@ -823,7 +830,7 @@ INDEX_TEMPLATE = """<!doctype html>
           node = document.createElement("iframe");
           node.src = iframe.getAttribute("src");
           node.setAttribute("frameborder", "0");
-          node.setAttribute("scrolling", "no");
+          node.setAttribute("scrolling", "auto");
         }} else if (img) {{
           node = document.createElement("img");
           node.src = img.getAttribute("src");
@@ -988,34 +995,18 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
             print(f'  WARNING: section not found: {section_ref}')
             continue
         md_text = doc_path.read_text(encoding='utf-8')
-        # Expand {{tab:id}} tokens in the raw markdown before any other
-        # processing — md_to_html will then see a native pipe table.
-        from .manifest import expand_table_tokens
-        md_text = expand_table_tokens(md_text, manifest.tables, src_dir)
         md_text = _upgrade_figure_path(md_text)
         body = md_to_html(md_text, resolve, resolve_citation=citations.resolve, resolve_ref=resolve_ref)
         section_htmls.append(_render_section_html(body))
         if verbose:
             print(f'    Rendered: {section_ref}')
 
-    # Abstract + paper header — both gated on manifest.metadata.render so
-    # proposal-style docs can skip the auto-rendered front matter and start
-    # directly with sections.
+    # Abstract (if present), rendered as an inline markdown snippet
     abstract_html = ''
-    paper_header_html = ''
-    if manifest.metadata.render:
-        if manifest.metadata.abstract:
-            abs_body = md_to_html(manifest.metadata.abstract, resolve,
-                                  resolve_citation=citations.resolve)
-            abstract_html = f'<aside class="abstract"><h2>Abstract</h2>{abs_body}</aside>'
-        title_text = manifest.metadata.title or 'Manuscript'
-        paper_header_html = (
-            f'<header class="paper-header">'
-            f'<div id="top" class="paper-title">{title_text}</div>'
-            f'{_render_authors_html(manifest)}'
-            f'{_render_affiliations_html(manifest)}'
-            f'</header>'
-        )
+    if manifest.metadata.abstract:
+        abs_body = md_to_html(manifest.metadata.abstract, resolve,
+                              resolve_citation=citations.resolve)
+        abstract_html = f'<aside class="abstract"><h2>Abstract</h2>{abs_body}</aside>'
 
     # Bibliography section — appended after all cited sections so numbering
     # reflects first-appearance order (matches natbib unsrt convention).
@@ -1029,33 +1020,14 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     toc = _extract_toc(sections_joined)
     toc_html = _render_toc_html(toc)
 
-    # Custom CSS via manifest.metadata.html_styles. Bare names resolve to
-    # styles/<name>.css; explicit paths (with .css extension) are taken
-    # as-is. The file is copied next to index.html and linked via <link>
-    # after the built-in <style> so user rules win on cascade tie.
-    custom_css_link = ''
-    custom_css_src: Optional[Path] = None
-    if manifest.metadata.html_styles:
-        ref = manifest.metadata.html_styles
-        p = Path(ref)
-        if p.suffix.lower() == '.css':
-            cand = p if p.is_absolute() else (root_dir / p)
-        else:
-            cand = root_dir / 'styles' / f'{ref}.css'
-        if cand.exists():
-            custom_css_src = cand
-        else:
-            print(f'  WARNING: html_styles CSS not found: {cand}')
-
     html = INDEX_TEMPLATE.format(
         title=title,
-        paper_header_html=paper_header_html,
+        authors_html=_render_authors_html(manifest),
+        affiliations_html=_render_affiliations_html(manifest),
         abstract_html=abstract_html,
         sections_html=sections_joined,
         toc_html=toc_html,
         katex_macros_json=json.dumps(katex_macros),
-        custom_css_link=(f'<link rel="stylesheet" href="{custom_css_src.name}"/>'
-                         if custom_css_src else ''),
     )
 
     # Write output
@@ -1063,10 +1035,6 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     html_dir.mkdir(parents=True, exist_ok=True)
     index_path = html_dir / 'index.html'
     index_path.write_text(html, encoding='utf-8')
-
-    if custom_css_src:
-        import shutil
-        shutil.copy2(custom_css_src, html_dir / custom_css_src.name)
 
     # Copy figures so <img>/<iframe> paths resolve. The copy plan flattens
     # subdirectories (figures/foo/foo.png → figures/foo.png) and crop_with_copy
@@ -1091,7 +1059,7 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
 
     # Post-process interactive (.html) figures: normalize Plotly exports
     # (multi-plot → tabbed layout) and inject the parent-side resize reporter.
-    # See src/document_sanity/plotly_html.py and docs/html-multi-plot-standard.md.
+    # See src/latex_builder/plotly_html.py and docs/html-multi-plot-standard.md.
     _normalize_plotly_html_figures(html_dir / 'figures', verbose=verbose)
 
     print(f'  HTML written: {index_path}')
