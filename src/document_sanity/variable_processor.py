@@ -220,6 +220,9 @@ class VariableProcessor:
                         key = tuple(str(self.default_variations.get(n, "")) for n in ext["variation_names"])
                         value = ext["variations"].get(key, "NA")
                     found = True
+                elif var_name in self.default_variations:
+                    value = self.default_variations[var_name]
+                    found = True
 
                 if found and value is not None and value != self.placeholder:
                     return self.format_value(value, format_spec)

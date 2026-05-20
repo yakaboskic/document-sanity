@@ -112,6 +112,12 @@ def _build_resolve_variable(processor: VariableProcessor, manifest: Manifest):
                     "names": ext["variation_names"],
                     "values": {",".join(k): processor.format_value(v, fmt) for k, v in ext["variations"].items()}
                 }
+        elif name in processor.default_variations:
+            display = processor.format_value(processor.default_variations[name], fmt)
+            is_defined = True
+            variation_info = {
+                "direct_mapping": name
+            }
 
         return (display, provenance, is_defined, variation_info)
 
@@ -924,6 +930,10 @@ INDEX_TEMPLATE = """<!doctype html>
     function updateDynamicVariables() {
       document.querySelectorAll('.var-has-variations').forEach(span => {
         const data = JSON.parse(span.dataset.variations);
+        if (data.direct_mapping) {
+          span.textContent = variationState[data.direct_mapping] || "NA";
+          return;
+        }
         const key = data.names.map(name => variationState[name] || "").join(',');
         if (data.values[key] !== undefined) {
           span.textContent = data.values[key];
@@ -942,7 +952,8 @@ INDEX_TEMPLATE = """<!doctype html>
 
       allVars.forEach(span => {
         const data = JSON.parse(span.dataset.variations);
-        data.names.forEach(n => {
+        const names = data.direct_mapping ? [data.direct_mapping] : (data.names || []);
+        names.forEach(n => {
            varNames.add(n);
            if (variationState[n] === undefined) variationState[n] = "";
         });
@@ -956,8 +967,15 @@ INDEX_TEMPLATE = """<!doctype html>
         const values = new Set();
         allVars.forEach(span => {
           const d = JSON.parse(span.dataset.variations);
-          const idx = d.names.indexOf(name);
-          if (idx !== -1) Object.keys(d.values).forEach(k => values.add(k.split(',')[idx]));
+          if (d.direct_mapping === name) {
+              // Direct mappings don't have a 'values' map in the same way,
+              // but we can infer the possible values from other variables
+              // that use this variation name.
+          }
+          if (d.names) {
+              const idx = d.names.indexOf(name);
+              if (idx !== -1) Object.keys(d.values).forEach(k => values.add(k.split(',')[idx]));
+          }
         });
         values.forEach(v => {
           if (!v) return;
