@@ -93,20 +93,27 @@ def _render_variable_span(name: str, fmt: Optional[str],
     """Return the <span> HTML for a {{VAR}} token.
 
     resolve_variable(name, fmt) must return (display_text, provenance_dict_or_None,
-    is_defined_bool).
+    is_defined_bool, variation_info_or_None).
     """
-    display, provenance, is_defined = resolve_variable(name, fmt)
+    display, provenance, is_defined, variation_info = resolve_variable(name, fmt)
     classes = ['var']
     if not is_defined:
         classes.append('var-undefined')
     if provenance:
         classes.append('var-has-provenance')
+    if variation_info:
+        classes.append('var-has-variations')
+
     attrs = [f'class="{" ".join(classes)}"', f'data-var="{_escape(name)}"']
     if fmt:
         attrs.append(f'data-fmt="{_escape(fmt)}"')
     if provenance:
         prov_json = json.dumps(provenance, ensure_ascii=True)
         attrs.append(f"data-provenance='{_html.escape(prov_json, quote=True)}'")
+    if variation_info:
+        var_json = json.dumps(variation_info, ensure_ascii=True)
+        attrs.append(f"data-variations='{_html.escape(var_json, quote=True)}'")
+
     return f'<span {" ".join(attrs)}>{_escape(display)}</span>'
 
 
@@ -139,7 +146,7 @@ def _convert_inline(text: str,
     def _protect_math(m: re.Match) -> str:
         content = m.group(0)
         def _math_var(vm: re.Match) -> str:
-            display, _, _ = resolve_variable(vm.group(1), vm.group(2))
+            display, _, _, _ = resolve_variable(vm.group(1), vm.group(2))
             return _prettify_sci_in_math(display)
         content = _VAR_RE.sub(_math_var, content)
         content = _prettify_sci_in_math(content)

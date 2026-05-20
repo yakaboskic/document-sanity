@@ -14,9 +14,11 @@ Also handles figure references:
 """
 
 import re
+import csv
+import logging
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 from dataclasses import dataclass
 
 
@@ -42,11 +44,15 @@ class VariableProcessor:
         figures: Optional[dict] = None,
         figures_dir: Optional[Path] = None,
         target: str = "pdf",
+        default_variations: Optional[dict] = None,
     ):
         self.variables: dict[str, Any] = {}
         self.placeholder = placeholder
         self.undefined_vars: list[UndefinedVariable] = []
         self.used_vars: set[str] = set()
+        self.external_vars: dict[str, dict[str, Any]] = {}
+        self.default_variations = default_variations or {}
+        self.logger = logging.getLogger(__name__)
 
         # Figure processing (FigureManifest-based)
         self.figure_manifest = figure_manifest
@@ -67,6 +73,62 @@ class VariableProcessor:
             data = json.load(f)
         self.variables.update(data)
         return len(data)
+
+    def load_external_data(self, src_dir: Path, external_data_configs: list) -> None:
+        """Load variables from external CSV/TSV/JSON files."""
+        for config in external_data_configs:
+            path = src_dir / config.source
+            if not path.exists():
+                self.logger.warning(f"External data file not found: {path}")
+                continue
+
+            if path.suffix == '.csv':
+                with open(path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    self._process_rows(reader, config)
+            elif path.suffix == '.tsv':
+                with open(path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f, delimiter='\t')
+                    self._process_rows(reader, config)
+            elif path.suffix == '.json':
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self._process_rows(data, config)
+
+    def _process_rows(self, rows, config):
+        for row in rows:
+            name = "_".join(row[c] for c in config.name_columns)
+            if name in self.variables:
+                self.logger.warning(f"External variable '{name}' conflicts with manifest variable.")
+
+            val = row[config.value_column]
+            # Try to convert to numeric for proper formatting later
+            try:
+                if '.' in val:
+                    val = float(val)
+                else:
+                    val = int(val)
+            except (ValueError, TypeError):
+                pass
+
+            vars_info = self.external_vars.setdefault(name, {
+                "global_value": None,
+                "variation_names": config.variation_columns,
+                "variations": {}
+            })
+            if not config.variation_columns:
+                vars_info["global_value"] = val
+            else:
+                key = tuple(row[c] for c in config.variation_columns)
+                vars_info["variations"][key] = val
+
+        # Post-process: if a variable has only one unique value across all variations,
+        # treat it as a global default.
+        for name, info in self.external_vars.items():
+            if info["global_value"] is None and info["variations"]:
+                unique_values = set(info["variations"].values())
+                if len(unique_values) == 1:
+                    info["global_value"] = list(unique_values)[0]
 
     def format_value(self, value: Any, format_spec: Optional[str]) -> str:
         """Format a value using Python format specification."""
@@ -96,9 +158,11 @@ class VariableProcessor:
         lines = content.split('\n')
         result_lines = []
 
+        from .manifest import resolve_figure
+
         for line_num, line in enumerate(lines, start=1):
             # Replace figures first (both {{fig:name}} and {{canva:N}} syntax)
-            def _resolve_figure(figure_id: str) -> str:
+            def _resolve_figure_tag(figure_id: str) -> str:
                 """Resolve a figure ID to an \\includegraphics command."""
                 # Try FigureManifest first (JSON-based)
                 if self.figure_manifest and self.output_dir:
@@ -113,7 +177,6 @@ class VariableProcessor:
                     # back to the legacy `source` attribute otherwise.
                     resolved_path = None
                     if self.figures_dir is not None:
-                        from .manifest import resolve_figure
                         resolved_path = resolve_figure(
                             fig_entry, self.target, self.figures_dir
                         )
@@ -130,10 +193,10 @@ class VariableProcessor:
                 return f"\\includegraphics[width=\\textwidth]{{FIGURE:{figure_id}}}"
 
             def replace_figure(match: re.Match) -> str:
-                return _resolve_figure(match.group(1))
+                return _resolve_figure_tag(match.group(1))
 
             def replace_canva(match: re.Match) -> str:
-                return _resolve_figure(match.group(1))
+                return _resolve_figure_tag(match.group(1))
 
             line = re.sub(fig_pattern, replace_figure, line)
             line = re.sub(canva_pattern, replace_canva, line)
@@ -144,23 +207,29 @@ class VariableProcessor:
                 format_spec = match.group(2)
                 self.used_vars.add(var_name)
 
+                value = None
+                found = False
                 if var_name in self.variables:
                     value = self.variables[var_name]
-                    if value is None:
-                        self.undefined_vars.append(UndefinedVariable(
-                            name=var_name, format_spec=format_spec,
-                            file_path=file_path or "<unknown>",
-                            line_number=line_num, line_content=line.strip(),
-                        ))
-                        return self.placeholder
+                    found = True
+                elif var_name in self.external_vars:
+                    ext = self.external_vars[var_name]
+                    if ext["global_value"] is not None:
+                        value = ext["global_value"]
+                    else:
+                        key = tuple(str(self.default_variations.get(n, "")) for n in ext["variation_names"])
+                        value = ext["variations"].get(key, "NA")
+                    found = True
+
+                if found and value is not None and value != self.placeholder:
                     return self.format_value(value, format_spec)
-                else:
-                    self.undefined_vars.append(UndefinedVariable(
-                        name=var_name, format_spec=format_spec,
-                        file_path=file_path or "<unknown>",
-                        line_number=line_num, line_content=line.strip(),
-                    ))
-                    return self.placeholder
+
+                self.undefined_vars.append(UndefinedVariable(
+                    name=var_name, format_spec=format_spec,
+                    file_path=file_path or "<unknown>",
+                    line_number=line_num, line_content=line.strip(),
+                ))
+                return self.placeholder
 
             result_line = re.sub(var_pattern, replace_var, line)
             result_lines.append(result_line)
