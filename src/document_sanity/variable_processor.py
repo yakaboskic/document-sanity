@@ -132,6 +132,9 @@ class VariableProcessor:
 
     def format_value(self, value: Any, format_spec: Optional[str]) -> str:
         """Format a value using Python format specification."""
+        if value == "error":
+            return "error"
+
         if format_spec is None or format_spec == '':
             return str(value) if not isinstance(value, str) else value
 
@@ -149,9 +152,50 @@ class VariableProcessor:
         except (ValueError, TypeError):
             return str(value)
 
+    def get_value(self, var_name: str, variations: Optional[dict] = None) -> Any:
+        """Retrieve the numeric or string value of a variable."""
+        if var_name in self.variables:
+            return self.variables[var_name]
+        if var_name in self.external_vars:
+            ext = self.external_vars[var_name]
+            if ext["global_value"] is not None:
+                return ext["global_value"]
+
+            # Use provided variations or default ones
+            current_variations = variations if variations is not None else self.default_variations
+            key = tuple(str(current_variations.get(n, "")) for n in ext["variation_names"])
+            return ext["variations"].get(key, "NA")
+        if var_name in self.default_variations:
+            return self.default_variations[var_name]
+        return None
+
+    def evaluate_expression(self, expr: str, variations: Optional[dict] = None) -> Any:
+        """Evaluate a simple arithmetic expression involving variables."""
+        # Find all potential variable names (alphanumeric words)
+        tokens = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', expr)
+
+        # Build evaluation context
+        context = {}
+        for token in set(tokens):
+            val = self.get_value(token, variations)
+            if val is not None:
+                if isinstance(val, (int, float)):
+                    context[token] = val
+                else:
+                    # Found but not numeric
+                    return "error"
+            # If val is None, it might be a constant or we'll let eval fail if it's meant to be a var
+
+        try:
+            # Restrict eval to basic math. No __builtins__.
+            return eval(expr, {"__builtins__": {}}, context)
+        except Exception:
+            return "error"
+
     def replace_variables(self, content: str, file_path: Optional[str] = None) -> str:
         """Replace all {{variable}}, {{variable:format}}, {{fig:name}}, and {{canva:N}} in content."""
         var_pattern = r'\{\{([a-zA-Z_][a-zA-Z0-9_]*)(?::([^}]+))?\}\}'
+        op_pattern = r'\{\{op:\s*(.+?)\s*(?::([^}]+))?\}\}'
         fig_pattern = r'\{\{fig:([a-zA-Z_][a-zA-Z0-9_]*)\}\}'
         canva_pattern = r'\{\{canva:(\d+)\}\}'
 
@@ -201,30 +245,24 @@ class VariableProcessor:
             line = re.sub(fig_pattern, replace_figure, line)
             line = re.sub(canva_pattern, replace_canva, line)
 
+            # Handle calculations: {{op: expr :fmt}}
+            def replace_op(match: re.Match) -> str:
+                expr = match.group(1)
+                format_spec = match.group(2)
+                value = self.evaluate_expression(expr)
+                return self.format_value(value, format_spec)
+
+            line = re.sub(op_pattern, replace_op, line)
+
             # Then replace variables
             def replace_var(match: re.Match) -> str:
                 var_name = match.group(1)
                 format_spec = match.group(2)
                 self.used_vars.add(var_name)
 
-                value = None
-                found = False
-                if var_name in self.variables:
-                    value = self.variables[var_name]
-                    found = True
-                elif var_name in self.external_vars:
-                    ext = self.external_vars[var_name]
-                    if ext["global_value"] is not None:
-                        value = ext["global_value"]
-                    else:
-                        key = tuple(str(self.default_variations.get(n, "")) for n in ext["variation_names"])
-                        value = ext["variations"].get(key, "NA")
-                    found = True
-                elif var_name in self.default_variations:
-                    value = self.default_variations[var_name]
-                    found = True
+                value = self.get_value(var_name)
 
-                if found and value is not None and value != self.placeholder:
+                if value is not None and value != self.placeholder:
                     return self.format_value(value, format_spec)
 
                 self.undefined_vars.append(UndefinedVariable(

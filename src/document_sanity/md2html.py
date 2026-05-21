@@ -50,9 +50,10 @@ _LATEX_FENCE_RE = re.compile(
 _CODE_FENCE_RE = re.compile(r'```(\w*)\s*\n(.*?)```', re.DOTALL)
 
 
-# Variable token: {{name}} or {{name:fmt}}. Match mixed-case identifiers
-# (some variables have lowercase segments like ..._AT_RS_eq_...).
-_VAR_RE = re.compile(r'\{\{([A-Za-z_][A-Za-z0-9_]*)(?::([^}]+))?\}\}')
+# Variable token: {{name}}, {{name:fmt}}, or {{op: expr :fmt}}.
+# Match mixed-case identifiers (some variables have lowercase segments like
+# ..._AT_RS_eq_...).
+_VAR_RE = re.compile(r'\{\{(op:\s*.+?|[A-Za-z_][A-Za-z0-9_]*)(?::([^}]+))?\}\}')
 
 
 # Image/link markdown
@@ -146,7 +147,9 @@ def _convert_inline(text: str,
     def _protect_math(m: re.Match) -> str:
         content = m.group(0)
         def _math_var(vm: re.Match) -> str:
-            display, _, _, _ = resolve_variable(vm.group(1), vm.group(2))
+            name = vm.group(1).strip()
+            fmt = vm.group(2)
+            display, _, _, _ = resolve_variable(name, fmt)
             return _prettify_sci_in_math(display)
         content = _VAR_RE.sub(_math_var, content)
         content = _prettify_sci_in_math(content)
@@ -165,7 +168,9 @@ def _convert_inline(text: str,
 
     def _var_repl(m: re.Match) -> str:
         key = f'\x00V{counter[0]}\x00'
-        var_spans[key] = _render_variable_span(m.group(1), m.group(2), resolve_variable)
+        name = m.group(1).strip()
+        fmt = m.group(2)
+        var_spans[key] = _render_variable_span(name, fmt, resolve_variable)
         counter[0] += 1
         return key
     text = _VAR_RE.sub(_var_repl, text)
