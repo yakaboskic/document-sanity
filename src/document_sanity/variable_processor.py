@@ -97,17 +97,23 @@ class VariableProcessor:
 
     def _process_rows(self, rows, config):
         for row in rows:
-            name = "_".join(row[c] for c in config.name_columns)
+            # Construct name from only columns that have values (not "NA")
+            name_parts = [str(row[c]) for c in config.name_columns if str(row[c]) != "NA"]
+            name = "_".join(name_parts)
+
             if name in self.variables:
                 self.logger.warning(f"External variable '{name}' conflicts with manifest variable.")
 
             val = row[config.value_column]
             # Try to convert to numeric for proper formatting later
             try:
-                if '.' in val:
-                    val = float(val)
-                else:
-                    val = int(val)
+                if isinstance(val, str):
+                    if '.' in val:
+                        val = float(val)
+                    else:
+                        val = int(val)
+                elif isinstance(val, (int, float)):
+                    pass # already numeric
             except (ValueError, TypeError):
                 pass
 
@@ -119,8 +125,12 @@ class VariableProcessor:
             if not config.variation_columns:
                 vars_info["global_value"] = val
             else:
-                key = tuple(row[c] for c in config.variation_columns)
-                vars_info["variations"][key] = val
+                variation_vals = [str(row[c]) for c in config.variation_columns]
+                if all(v == "NA" for v in variation_vals):
+                    vars_info["global_value"] = val
+                else:
+                    key = tuple(variation_vals)
+                    vars_info["variations"][key] = val
 
         # Post-process: if a variable has only one unique value across all variations,
         # treat it as a global default.
@@ -154,8 +164,13 @@ class VariableProcessor:
 
     def get_value(self, var_name: str, variations: Optional[dict] = None) -> Any:
         """Retrieve the numeric or string value of a variable."""
+        # Check provided variations first
+        if variations is not None and var_name in variations:
+            return variations[var_name]
+
         if var_name in self.variables:
             return self.variables[var_name]
+
         if var_name in self.external_vars:
             ext = self.external_vars[var_name]
             if ext["global_value"] is not None:
@@ -165,8 +180,10 @@ class VariableProcessor:
             current_variations = variations if variations is not None else self.default_variations
             key = tuple(str(current_variations.get(n, "")) for n in ext["variation_names"])
             return ext["variations"].get(key, "NA")
+
         if var_name in self.default_variations:
             return self.default_variations[var_name]
+
         return None
 
     def evaluate_expression(self, expr: str, variations: Optional[dict] = None) -> Any:
@@ -181,8 +198,17 @@ class VariableProcessor:
             if val is not None:
                 if isinstance(val, (int, float)):
                     context[token] = val
+                elif isinstance(val, str):
+                    # Try to convert to numeric for evaluation
+                    try:
+                        if '.' in val:
+                            context[token] = float(val)
+                        else:
+                            context[token] = int(val)
+                    except ValueError:
+                        return "error"
                 else:
-                    # Found but not numeric
+                    # Found but not numeric-convertible
                     return "error"
             # If val is None, it might be a constant or we'll let eval fail if it's meant to be a var
 
