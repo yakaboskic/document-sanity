@@ -81,13 +81,74 @@ def _build_resolve_variable(processor: VariableProcessor, manifest: Manifest):
     var_entries = manifest.variables
     external_vars = processor.external_vars
 
+    # Build a map of variation name -> all possible values seen in external data
+    # used for pre-calculating expression results across all combinations.
+    variation_values: dict[str, set[str]] = {}
+    for ext in external_vars.values():
+        for i, v_name in enumerate(ext["variation_names"]):
+            vals = variation_values.setdefault(v_name, set())
+            for key_tuple in ext["variations"].keys():
+                vals.add(str(key_tuple[i]))
+
     def resolve(name: str, fmt: Optional[str]):
         display = processor.placeholder
         provenance = None
         is_defined = False
         variation_info = None
 
-        if name in var_entries:
+        if name.startswith("op:"):
+            expr = name[3:].strip()
+            # Find all potential variable names (alphanumeric words)
+            import re
+            tokens = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', expr)
+
+            # Determine all variation names involved in this calculation
+            involved_vars = []
+            involved_variation_names = []
+            for token in set(tokens):
+                if token in external_vars:
+                    involved_vars.append(token)
+                    for vn in external_vars[token]["variation_names"]:
+                        if vn not in involved_variation_names:
+                            involved_variation_names.append(vn)
+                elif token in processor.default_variations:
+                    if token not in involved_variation_names:
+                        involved_variation_names.append(token)
+
+            if not involved_variation_names:
+                # No dynamic variables involved, just calculate once
+                val = processor.evaluate_expression(expr)
+                display = processor.format_value(val, fmt)
+                is_defined = True
+            else:
+                # Dynamic calculation: pre-calculate for all combinations of variations
+                from itertools import product
+                is_defined = True
+                display = processor.format_value(processor.evaluate_expression(expr), fmt)
+
+                # Get all possible values for each variation name involved
+                # Fallback to current default if no values found in external data
+                axes = []
+                for vn in involved_variation_names:
+                    vals = list(variation_values.get(vn, set()))
+                    if not vals and vn in processor.default_variations:
+                        vals = [str(processor.default_variations[vn])]
+                    if not vals:
+                        vals = [""]
+                    axes.append(sorted(vals))
+
+                precomputed = {}
+                for combination in product(*axes):
+                    # Build variations dict for this combination
+                    current_variations = dict(zip(involved_variation_names, combination))
+                    val = processor.evaluate_expression(expr, variations=current_variations)
+                    precomputed[",".join(combination)] = processor.format_value(val, fmt)
+
+                variation_info = {
+                    "names": involved_variation_names,
+                    "values": precomputed
+                }
+        elif name in var_entries:
             entry = var_entries[name]
             if entry.value is not None:
                 display = processor.format_value(entry.value, fmt)
