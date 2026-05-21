@@ -310,6 +310,13 @@ class VariableProcessor:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(processed, encoding='utf-8')
 
+    def get_all_available_variables(self) -> list[str]:
+        """Get a sorted list of all available variable names."""
+        all_vars = set(self.variables.keys())
+        all_vars.update(self.external_vars.keys())
+        all_vars.update(self.default_variations.keys())
+        return sorted(all_vars)
+
     def get_unused_variables(self) -> list[str]:
         """Get list of variables defined but never used."""
         return sorted(set(self.variables.keys()) - self.used_vars)

@@ -453,6 +453,13 @@ class ManuscriptBuilder:
             print(f"    PDF generation failed")
             return False
 
+    def write_available_variables(self) -> None:
+        """Write a list of all available variables to available_variables.txt."""
+        vars_list = self.processor.get_all_available_variables()
+        out_path = self.out_dir / "available_variables.txt"
+        out_path.write_text("\n".join(vars_list), encoding='utf-8')
+        print(f"    Available variables written: {out_path}")
+
     def generate_build_log(self) -> None:
         """Write a build metadata log."""
         import json
@@ -500,6 +507,7 @@ class ManuscriptBuilder:
         self.copy_figures()
         self.copy_tables()
         self.copy_supporting_files()
+        self.write_available_variables()
         self.generate_build_log()
 
         # Report
