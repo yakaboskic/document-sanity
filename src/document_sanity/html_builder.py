@@ -77,35 +77,110 @@ def _compute_figures_copy_plan(src_dir: Path, html_dir: Path) -> list[tuple[Path
 
 
 def _build_resolve_variable(processor: VariableProcessor, manifest: Manifest):
-    """Return a (name, fmt) -> (display, provenance, is_defined) callable."""
+    """Return a (name, fmt) -> (display, provenance, is_defined, variation_info) callable."""
     var_entries = manifest.variables
+    external_vars = processor.external_vars
+
+    # Build a map of variation name -> all possible values seen in external data
+    # used for pre-calculating expression results across all combinations.
+    variation_values: dict[str, set[str]] = {}
+    for ext in external_vars.values():
+        for i, v_name in enumerate(ext["variation_names"]):
+            vals = variation_values.setdefault(v_name, set())
+            for key_tuple in ext["variations"].keys():
+                vals.add(str(key_tuple[i]))
 
     def resolve(name: str, fmt: Optional[str]):
-        entry = var_entries.get(name)
-        if entry is None:
-            return (processor.placeholder, None, False)
-        if entry.value is None:
-            display = processor.placeholder
-            is_defined = False
-        else:
-            try:
-                display = processor.format_value(entry.value, fmt)
-            except Exception:
-                display = str(entry.value)
-            is_defined = True
+        display = processor.placeholder
         provenance = None
-        if entry.provenance:
-            p = entry.provenance
-            provenance = {
-                'source': p.source,
-                'data': p.data,
-                'command': p.command,
-                'description': p.description,
-                'updated': p.updated,
+        is_defined = False
+        variation_info = None
+
+        if name.startswith("op:"):
+            expr = name[3:].strip()
+            # Find all potential variable names (alphanumeric words)
+            import re
+            tokens = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', expr)
+
+            # Determine all variation names involved in this calculation
+            involved_vars = []
+            involved_variation_names = []
+            for token in set(tokens):
+                if token in external_vars:
+                    involved_vars.append(token)
+                    for vn in external_vars[token]["variation_names"]:
+                        if vn not in involved_variation_names:
+                            involved_variation_names.append(vn)
+                elif token in processor.default_variations:
+                    if token not in involved_variation_names:
+                        involved_variation_names.append(token)
+
+            if not involved_variation_names:
+                # No dynamic variables involved, just calculate once
+                val = processor.evaluate_expression(expr)
+                display = processor.format_value(val, fmt)
+                is_defined = True
+            else:
+                # Dynamic calculation: pre-calculate for all combinations of variations
+                from itertools import product
+                is_defined = True
+                display = processor.format_value(processor.evaluate_expression(expr), fmt)
+
+                # Get all possible values for each variation name involved
+                # Fallback to current default if no values found in external data
+                axes = []
+                for vn in involved_variation_names:
+                    vals = list(variation_values.get(vn, set()))
+                    if not vals and vn in processor.default_variations:
+                        vals = [str(processor.default_variations[vn])]
+                    if not vals:
+                        vals = [""]
+                    axes.append(sorted(vals))
+
+                precomputed = {}
+                for combination in product(*axes):
+                    # Build variations dict for this combination
+                    current_variations = dict(zip(involved_variation_names, combination))
+                    val = processor.evaluate_expression(expr, variations=current_variations)
+                    precomputed[",".join(combination)] = processor.format_value(val, fmt)
+
+                variation_info = {
+                    "names": involved_variation_names,
+                    "values": precomputed
+                }
+        elif name in var_entries:
+            entry = var_entries[name]
+            if entry.value is not None:
+                display = processor.format_value(entry.value, fmt)
+                is_defined = True
+            if entry.provenance:
+                p = entry.provenance
+                provenance = {
+                    'source': p.source, 'data': p.data, 'command': p.command,
+                    'description': p.description, 'updated': p.updated,
+                }
+                provenance = {k: v for k, v in provenance.items() if v}
+        elif name in external_vars:
+            ext = external_vars[name]
+            is_defined = True
+            if ext["global_value"] is not None:
+                display = processor.format_value(ext["global_value"], fmt)
+            else:
+                key = tuple(str(processor.default_variations.get(n, "")) for n in ext["variation_names"])
+                val = ext["variations"].get(key, "NA")
+                display = processor.format_value(val, fmt)
+                variation_info = {
+                    "names": ext["variation_names"],
+                    "values": {",".join(k): processor.format_value(v, fmt) for k, v in ext["variations"].items()}
+                }
+        elif name in processor.default_variations:
+            display = processor.format_value(processor.default_variations[name], fmt)
+            is_defined = True
+            variation_info = {
+                "direct_mapping": name
             }
-            # Drop empty keys to keep the JSON attribute tidy
-            provenance = {k: v for k, v in provenance.items() if v}
-        return (display, provenance, is_defined)
+
+        return (display, provenance, is_defined, variation_info)
 
     return resolve
 
@@ -272,20 +347,39 @@ INDEX_TEMPLATE = """<!doctype html>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <style>
-  :root {{
+  :root {
     --border: 214 32% 91%;
     --muted: 220 14% 96%;
     --muted-foreground: 220 9% 46%;
     --accent: 221 83% 53%;
-  }}
-  body {{
+  }
+  #variation-panel {
+    position: fixed; top: 0; right: -350px;
+    width: 350px; height: 100%;
+    background: white; border-left: 1px solid #e2e8f0;
+    z-index: 200; transition: right 0.3s; padding: 2rem;
+    overflow-y: auto; box-shadow: -4px 0 6px -1px rgb(0 0 0 / 0.1);
+  }
+  #variation-panel.open { right: 0; }
+  .gear-btn {
+    position: fixed; top: 1.5rem; right: 1.5rem;
+    z-index: 210; cursor: pointer; font-size: 1.5rem;
+    color: #64748b; transition: transform 0.3s;
+  }
+  .gear-btn:hover { transform: rotate(90deg); color: #0f172a; }
+  .variation-group { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #f1f5f9; }
+  .variation-group h4 { margin-bottom: 0.5rem; color: #475569; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .var-select { width: 100%; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.375rem; background: white; font-size: 0.875rem; }
+  .var-has-variations { border-bottom: 1px dashed #3b82f6; cursor: help; }
+
+  body {
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     color: #111827;
     margin: 0;
     padding: 0;
     line-height: 1.65;
-  }}
-  .layout {{
+  }
+  .layout {
     display: grid;
     grid-template-columns: 240px minmax(0, 820px) 0px;
     gap: 2rem;
@@ -295,17 +389,17 @@ INDEX_TEMPLATE = """<!doctype html>
     padding: 2rem 1.5rem 6rem;
     /* Material-style ease-in-out for the column-width shift */
     transition: grid-template-columns .45s cubic-bezier(0.4, 0, 0.2, 1);
-  }}
-  .layout.prov-open {{
+  }
+  .layout.prov-open {
     grid-template-columns: 240px minmax(0, 1fr) 380px;
-  }}
-  @media (max-width: 900px) {{
-    .layout {{ grid-template-columns: 1fr; justify-content: stretch; }}
-    .toc {{ position: static !important; max-height: none !important; }}
-    .layout.prov-open {{ grid-template-columns: 1fr; }}
-    .provenance-panel {{ display: none !important; }}
-  }}
-  .toc {{
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; justify-content: stretch; }
+    .toc { position: static !important; max-height: none !important; }
+    .layout.prov-open { grid-template-columns: 1fr; }
+    .provenance-panel { display: none !important; }
+  }
+  .toc {
     position: sticky;
     top: 1.5rem;
     align-self: start;
@@ -314,96 +408,95 @@ INDEX_TEMPLATE = """<!doctype html>
     font-size: .85rem;
     padding-right: .5rem;
     border-right: 1px solid hsl(var(--border));
-  }}
-  .toc h3 {{
+  }
+  .toc h3 {
     font-size: .75rem;
     text-transform: uppercase;
     letter-spacing: .1em;
     color: hsl(var(--muted-foreground));
     margin: 0 0 .75rem 0;
     font-weight: 600;
-  }}
-  .toc ul {{ list-style: none; padding: 0; margin: 0; }}
-  .toc li {{ margin: .15rem 0; }}
-  .toc li a {{
+  }
+  .toc ul { list-style: none; padding: 0; margin: 0; }
+  .toc li { margin: .15rem 0; }
+  .toc li a {
     display: block;
     padding: .15rem .5rem;
     border-radius: .25rem;
     color: #374151;
     transition: background .1s, color .1s;
-  }}
-  .toc li a:hover {{ background: hsl(var(--muted)); color: hsl(var(--accent)); text-decoration: none; }}
-  .toc li a.active {{ background: color-mix(in srgb, hsl(var(--accent)) 12%, transparent); color: hsl(var(--accent)); font-weight: 500; }}
-  .toc-h1 a {{ font-weight: 600; }}
-  .toc-h2 {{ padding-left: 0.75rem; }}
-  .toc-h3 {{ padding-left: 1.75rem; font-size: .8rem; }}
-  .toc-h4 {{ padding-left: 2.5rem; font-size: .75rem; color: hsl(var(--muted-foreground)); }}
+  }
+  .toc li a:hover { background: hsl(var(--muted)); color: hsl(var(--accent)); text-decoration: none; }
+  .toc li a.active { background: color-mix(in srgb, hsl(var(--accent)) 12%, transparent); color: hsl(var(--accent)); font-weight: 500; }
+  .toc-h1 a { font-weight: 600; }
+  .toc-h2 { padding-left: 0.75rem; }
+  .toc-h3 { padding-left: 1.75rem; font-size: .8rem; }
+  .toc-h4 { padding-left: 2.5rem; font-size: .75rem; color: hsl(var(--muted-foreground)); }
   /* Qualify with .content because Tailwind Play CDN injects preflight AFTER
-     the page's <style>, resetting bare `h1 {{ ... }}` rules. Higher specificity
+     the page's <style>, resetting bare `h1 { ... }` rules. Higher specificity
      (class selector) beats Tailwind's element selector. */
-  .content h1, .content h2, .content h3, .content h4 {{
+  .content h1, .content h2, .content h3, .content h4 {
     font-weight: 700; line-height: 1.25; color: #0f172a;
-  }}
+  }
   /* Paper title: a distinct element, centered, larger. Not a section heading. */
-  .paper-title {{
+  .paper-title {
     font-size: 2.25rem; font-weight: 700; line-height: 1.2;
     letter-spacing: -0.015em; color: #0f172a;
     text-align: center; margin: 0 0 1.25rem 0;
-  }}
+  }
   /* Section and subsection headings: left-aligned, sized for in-document use. */
-  .content h1 {{
+  .content h1 {
     font-size: 1.875rem; margin-top: 3rem; margin-bottom: 1rem;
     letter-spacing: -0.01em;
-  }}
-  .content h2 {{
+  }
+  .content h2 {
     font-size: 1.5rem; margin-top: 2.5rem; margin-bottom: .75rem;
     letter-spacing: -0.005em;
-  }}
-  .content h3 {{ font-size: 1.25rem; margin-top: 2rem; margin-bottom: .5rem; font-weight: 600; }}
-  .content h4 {{ font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: .4rem; font-weight: 600; color: #334155; }}
-  .toc h3 {{
+  }
+  .content h3 { font-size: 1.25rem; margin-top: 2rem; margin-bottom: .5rem; font-weight: 600; }
+  .content h4 { font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: .4rem; font-weight: 600; color: #334155; }
+  .toc h3 {
     font-size: .75rem; text-transform: uppercase; letter-spacing: .1em;
     color: hsl(var(--muted-foreground)); margin: 0 0 .75rem 0; font-weight: 600;
-  }}
-  .abstract h2 {{
+  }
+  .abstract h2 {
     border: none; font-size: 1rem; text-transform: uppercase;
     letter-spacing: .08em; margin: 0 0 .5rem 0; padding: 0;
     font-weight: 700; color: hsl(var(--muted-foreground));
-  }}
-  .paper-section {{ margin-top: 3rem; }}
-  .paper-section:first-of-type {{ margin-top: 0; }}
+  }
+  .paper-section { margin-top: 3rem; }
+  .paper-section:first-of-type { margin-top: 0; }
   .paper-section > h1:first-child,
-  .paper-section > h2:first-child {{ margin-top: 0; }}
-  p {{ margin: .75rem 0; }}
-  a {{ color: hsl(var(--accent)); text-decoration: none; }}
-  a:hover {{ text-decoration: underline; }}
-  code {{ background: hsl(var(--muted)); padding: 0.1rem 0.35rem; border-radius: .25rem; font-size: 0.9em; }}
-  pre {{ background: hsl(var(--muted)); padding: 1rem; border-radius: .5rem; overflow-x: auto; }}
-  blockquote {{ border-left: 3px solid hsl(var(--border)); padding-left: 1rem; color: hsl(var(--muted-foreground)); margin: 1rem 0; }}
-  figure {{ margin: 3rem 0; text-align: center; }}
-  figure img {{ display: inline-block; max-width: 100%; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
-  figure figcaption, .figure-html .caption, .figure-pdf .caption {{
+  .paper-section > h2:first-child { margin-top: 0; }
+  p { margin: .75rem 0; }
+  a { color: hsl(var(--accent)); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: hsl(var(--muted)); padding: 0.1rem 0.35rem; border-radius: .25rem; font-size: 0.9em; }
+  pre { background: hsl(var(--muted)); padding: 1rem; border-radius: .5rem; overflow-x: auto; }
+  blockquote { border-left: 3px solid hsl(var(--border)); padding-left: 1rem; color: hsl(var(--muted-foreground)); margin: 1rem 0; }
+  figure { margin: 3rem 0; text-align: center; }
+  figure img { display: inline-block; max-width: 100%; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  figure figcaption, .figure-html .caption, .figure-pdf .caption {
     font-size: .9rem; color: hsl(var(--muted-foreground)); margin-top: 1rem;
     text-align: center; padding: 0 1rem; line-height: 1.5;
-  }}
-  .figure-html, .figure-pdf {{ margin: 3rem 0; }}
+  }
+  .figure-html, .figure-pdf { margin: 3rem 0; }
   /* Interactive (Plotly / HTML) figures. The embedded figure uses
      postMessage to tell the parent its natural height; parent resizes the
      iframe to match. 420px is a reasonable fallback while the message is
      in flight. */
-  iframe.interactive-fig {{
-    display: block; width: 100%;
-    height: 420px;
+  iframe.interactive-fig {
+    display: block; 
+    width: 100%;
     border: 1px solid hsl(var(--border));
     border-radius: .5rem;
     background: white;
-    overflow: hidden;
     transition: height .2s ease-out;
-  }}
+  }
 
   /* Expand-to-modal button — injected onto every figure at runtime. */
-  figure.figure-img, figure.figure-html, .figure-pdf {{ position: relative; }}
-  .fig-expand-btn {{
+  figure.figure-img, figure.figure-html, .figure-pdf { position: relative; }
+  .fig-expand-btn {
     position: absolute; top: .5rem; right: .5rem; z-index: 5;
     width: 2rem; height: 2rem;
     display: flex; align-items: center; justify-content: center;
@@ -414,24 +507,24 @@ INDEX_TEMPLATE = """<!doctype html>
     color: #475569;
     opacity: 0; transition: opacity .15s, color .15s, background .15s;
     backdrop-filter: blur(4px);
-  }}
+  }
   figure.figure-img:hover .fig-expand-btn,
   figure.figure-html:hover .fig-expand-btn,
-  .figure-pdf:hover .fig-expand-btn {{ opacity: 1; }}
-  .fig-expand-btn:hover {{ color: hsl(var(--accent)); background: white; }}
-  .fig-expand-btn svg {{ width: 1rem; height: 1rem; }}
+  .figure-pdf:hover .fig-expand-btn { opacity: 1; }
+  .fig-expand-btn:hover { color: hsl(var(--accent)); background: white; }
+  .fig-expand-btn svg { width: 1rem; height: 1rem; }
 
   /* Modal overlay + dialog */
-  .fig-modal-backdrop {{
+  .fig-modal-backdrop {
     position: fixed; inset: 0; z-index: 100;
     background: rgba(15, 23, 42, .6);
     display: none;
     align-items: center; justify-content: center;
     padding: 2rem;
     opacity: 0; transition: opacity .2s ease;
-  }}
-  .fig-modal-backdrop.visible {{ display: flex; opacity: 1; }}
-  .fig-modal {{
+  }
+  .fig-modal-backdrop.visible { display: flex; opacity: 1; }
+  .fig-modal {
     background: white;
     border-radius: .75rem;
     box-shadow: 0 25px 50px -12px rgba(0,0,0,.5);
@@ -440,91 +533,91 @@ INDEX_TEMPLATE = """<!doctype html>
     display: flex; flex-direction: column;
     overflow: hidden;
     transform: scale(.97); transition: transform .2s ease;
-  }}
-  .fig-modal-backdrop.visible .fig-modal {{ transform: none; }}
-  .fig-modal-head {{
+  }
+  .fig-modal-backdrop.visible .fig-modal { transform: none; }
+  .fig-modal-head {
     display: flex; align-items: center; justify-content: space-between;
     padding: .75rem 1rem;
     border-bottom: 1px solid hsl(var(--border));
     flex: 0 0 auto;
-  }}
-  .fig-modal-caption {{
+  }
+  .fig-modal-caption {
     font-size: .85rem; color: hsl(var(--muted-foreground));
     margin: 0; padding-right: 1rem;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }}
-  .fig-modal-close {{
+  }
+  .fig-modal-close {
     background: none; border: none; cursor: pointer;
     width: 2rem; height: 2rem;
     display: flex; align-items: center; justify-content: center;
     border-radius: .375rem; color: #475569; flex: 0 0 auto;
-  }}
-  .fig-modal-close:hover {{ background: hsl(var(--muted)); color: #0f172a; }}
-  .fig-modal-body {{
+  }
+  .fig-modal-close:hover { background: hsl(var(--muted)); color: #0f172a; }
+  .fig-modal-body {
     flex: 1 1 auto; min-height: 0;
     padding: 1rem;
     display: flex; align-items: center; justify-content: center;
     overflow: auto;
     background: #fafafa;
-  }}
-  .fig-modal-body img {{
+  }
+  .fig-modal-body img {
     max-width: 100%; max-height: 100%; object-fit: contain;
     border-radius: .25rem;
-  }}
-  .fig-modal-body iframe, .fig-modal-body embed {{
+  }
+  .fig-modal-body iframe, .fig-modal-body embed {
     width: 100%; height: 100%;
     border: 1px solid hsl(var(--border)); border-radius: .25rem;
     background: white;
-  }}
-  p + figure, figure + p {{ margin-top: 2.5rem; }}
-  p + .figure-html, p + .figure-pdf {{ margin-top: 2.5rem; }}
-  .figure-html + p, .figure-pdf + p {{ margin-top: 2.5rem; }}
-  .md-table {{ width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }}
-  .md-table th, .md-table td {{ border: 1px solid hsl(var(--border)); padding: .4rem .6rem; text-align: left; }}
-  .md-table thead th {{ background: hsl(var(--muted)); font-weight: 600; }}
-  .md-table tr:nth-child(even) td {{ background: color-mix(in srgb, hsl(var(--muted)) 50%, white); }}
+  }
+  p + figure, figure + p { margin-top: 2.5rem; }
+  p + .figure-html, p + .figure-pdf { margin-top: 2.5rem; }
+  .figure-html + p, .figure-pdf + p { margin-top: 2.5rem; }
+  .md-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }
+  .md-table th, .md-table td { border: 1px solid hsl(var(--border)); padding: .4rem .6rem; text-align: left; }
+  .md-table thead th { background: hsl(var(--muted)); font-weight: 600; }
+  .md-table tr:nth-child(even) td { background: color-mix(in srgb, hsl(var(--muted)) 50%, white); }
 
   /* Variable styling (inline, in prose) */
-  .var {{
+  .var {
     background: color-mix(in srgb, hsl(var(--accent)) 10%, transparent);
     padding: 0.05rem 0.25rem;
     border-radius: .25rem;
     font-variant-numeric: tabular-nums;
     cursor: default;
-  }}
-  .var.var-has-provenance {{ cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }}
-  .var.var-active {{
+  }
+  .var.var-has-provenance { cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .var.var-active {
     background: color-mix(in srgb, hsl(var(--accent)) 30%, transparent);
     outline: 2px solid hsl(var(--accent));
     outline-offset: 1px;
-  }}
-  .var.var-undefined {{
+  }
+  .var.var-undefined {
     background: color-mix(in srgb, #ef4444 20%, transparent);
     color: #991b1b;
-  }}
-  a.cite {{ color: hsl(var(--accent)); text-decoration: none; padding: 0 .1rem; }}
-  a.cite:hover {{ text-decoration: underline; }}
-  .cite-missing {{ color: #991b1b; }}
-  .ref {{ color: hsl(var(--accent)); font-style: italic; }}
-  ol.references {{ list-style: none; padding-left: 0; counter-reset: none; }}
-  ol.references li {{
+  }
+  a.cite { color: hsl(var(--accent)); text-decoration: none; padding: 0 .1rem; }
+  a.cite:hover { text-decoration: underline; }
+  .cite-missing { color: #991b1b; }
+  .ref { color: hsl(var(--accent)); font-style: italic; }
+  ol.references { list-style: none; padding-left: 0; counter-reset: none; }
+  ol.references li {
     display: grid; grid-template-columns: 2.5rem 1fr; gap: .25rem;
     padding: .5rem 0; border-bottom: 1px solid hsl(var(--border));
     font-size: .9rem;
-  }}
-  ol.references li:target {{
+  }
+  ol.references li:target {
     background: color-mix(in srgb, hsl(var(--accent)) 12%, transparent);
     margin: 0 -1rem; padding: .5rem 1rem;
     border-radius: .25rem;
-  }}
-  ol.references .bib-number {{ color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }}
-  ol.references .bib-title {{ font-weight: 500; }}
-  ol.references .bib-venue {{ color: hsl(var(--muted-foreground)); }}
+  }
+  ol.references .bib-number { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+  ol.references .bib-title { font-weight: 500; }
+  ol.references .bib-venue { color: hsl(var(--muted-foreground)); }
 
   /* Provenance side panel. Kept in DOM so the grid transitions smoothly from
      0 → 380px for the third column. overflow:hidden clips the content while
      the column width is small. */
-  .provenance-panel {{
+  .provenance-panel {
     position: sticky;
     top: 1.5rem;
     align-self: start;
@@ -541,8 +634,8 @@ INDEX_TEMPLATE = """<!doctype html>
       opacity .35s cubic-bezier(0.4, 0, 0.2, 1),
       transform .45s cubic-bezier(0.4, 0, 0.2, 1),
       visibility 0s linear .45s;
-  }}
-  .layout.prov-open .provenance-panel {{
+  }
+  .layout.prov-open .provenance-panel {
     opacity: 1;
     visibility: visible;
     transform: none;
@@ -552,79 +645,91 @@ INDEX_TEMPLATE = """<!doctype html>
       opacity .35s cubic-bezier(0.4, 0, 0.2, 1) .12s,
       transform .45s cubic-bezier(0.4, 0, 0.2, 1) .08s,
       visibility 0s;
-  }}
-  .prov-head {{ display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1rem; }}
-  .prov-title {{
+  }
+  .prov-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1rem; }
+  .prov-title {
     font-size: .75rem; text-transform: uppercase; letter-spacing: .1em;
     color: hsl(var(--muted-foreground)); font-weight: 600; margin: 0;
-  }}
-  .prov-close {{
+  }
+  .prov-close {
     background: none; border: none; cursor: pointer;
     color: hsl(var(--muted-foreground)); font-size: 1.25rem; line-height: 1;
     padding: .125rem .5rem; border-radius: .25rem;
-  }}
-  .prov-close:hover {{ background: hsl(var(--muted)); color: #0f172a; }}
-  .prov-graph {{ display: flex; flex-direction: column; align-items: stretch; gap: .25rem; margin-bottom: 1rem; }}
-  .prov-node {{
+  }
+  .prov-close:hover { background: hsl(var(--muted)); color: #0f172a; }
+  .prov-graph { display: flex; flex-direction: column; align-items: stretch; gap: .25rem; margin-bottom: 1rem; }
+  .prov-node {
     border: 1px solid hsl(var(--border)); border-radius: .5rem;
     padding: .6rem .75rem; background: white;
     transition: border-color .15s;
-  }}
-  .prov-node:hover {{ border-color: color-mix(in srgb, hsl(var(--accent)) 50%, hsl(var(--border))); }}
-  .prov-node .prov-label {{
+  }
+  .prov-node:hover { border-color: color-mix(in srgb, hsl(var(--accent)) 50%, hsl(var(--border))); }
+  .prov-node .prov-label {
     display: block; font-size: .65rem; text-transform: uppercase;
     letter-spacing: .08em; color: hsl(var(--muted-foreground));
     font-weight: 600; margin-bottom: .25rem;
-  }}
-  .prov-node.inputs {{ background: color-mix(in srgb, #60a5fa 10%, white); border-color: color-mix(in srgb, #60a5fa 30%, hsl(var(--border))); }}
-  .prov-node.command {{ background: color-mix(in srgb, #f59e0b 10%, white); border-color: color-mix(in srgb, #f59e0b 30%, hsl(var(--border))); font-family: ui-monospace, SFMono-Regular, monospace; font-size: .8rem; word-break: break-word; }}
-  .prov-node.output {{ background: color-mix(in srgb, #16a34a 10%, white); border-color: color-mix(in srgb, #16a34a 35%, hsl(var(--border))); }}
-  .prov-node ul {{ list-style: none; padding: 0; margin: 0; }}
-  .prov-node li {{ padding: .1rem 0; font-family: ui-monospace, SFMono-Regular, monospace; font-size: .8rem; word-break: break-word; }}
-  .prov-node li + li {{ border-top: 1px dashed hsl(var(--border)); margin-top: .25rem; padding-top: .35rem; }}
-  .prov-arrow {{
+  }
+  .prov-node.inputs { background: color-mix(in srgb, #60a5fa 10%, white); border-color: color-mix(in srgb, #60a5fa 30%, hsl(var(--border))); }
+  .prov-node.command { background: color-mix(in srgb, #f59e0b 10%, white); border-color: color-mix(in srgb, #f59e0b 30%, hsl(var(--border))); font-family: ui-monospace, SFMono-Regular, monospace; font-size: .8rem; word-break: break-word; }
+  .prov-node.output { background: color-mix(in srgb, #16a34a 10%, white); border-color: color-mix(in srgb, #16a34a 35%, hsl(var(--border))); }
+  .prov-node ul { list-style: none; padding: 0; margin: 0; }
+  .prov-node li { padding: .1rem 0; font-family: ui-monospace, SFMono-Regular, monospace; font-size: .8rem; word-break: break-word; }
+  .prov-node li + li { border-top: 1px dashed hsl(var(--border)); margin-top: .25rem; padding-top: .35rem; }
+  .prov-arrow {
     display: flex; align-items: center; justify-content: center;
     color: hsl(var(--muted-foreground)); font-size: 1.25rem; line-height: 1;
     height: 1.25rem;
-  }}
-  .prov-output-name {{ font-family: ui-monospace, SFMono-Regular, monospace; font-size: .85rem; font-weight: 600; }}
-  .prov-output-value {{
+  }
+  .prov-output-name { font-family: ui-monospace, SFMono-Regular, monospace; font-size: .85rem; font-weight: 600; }
+  .prov-output-value {
     display: inline-block; margin-left: .5rem; padding: .05rem .35rem;
     background: hsl(var(--muted)); border-radius: .25rem;
     font-family: ui-monospace, SFMono-Regular, monospace; font-variant-numeric: tabular-nums;
-  }}
-  .prov-description {{
+  }
+  .prov-description {
     font-size: .85rem; color: hsl(var(--muted-foreground));
     margin: 0 0 1rem 0;
-  }}
-  .prov-updated {{
+  }
+  .prov-updated {
     font-size: .75rem; color: hsl(var(--muted-foreground));
     text-align: right; margin: .75rem 0 0 0;
     font-variant-numeric: tabular-nums;
-  }}
-  .prov-empty {{
+  }
+  .prov-empty {
     color: hsl(var(--muted-foreground)); font-style: italic;
     padding: 1rem; text-align: center;
-  }}
+  }
 
-  .paper-header {{
+  .paper-header {
     margin-bottom: 2rem; border-bottom: 1px solid hsl(var(--border));
     padding-bottom: 1.5rem; text-align: center;
-  }}
-  .authors {{ margin-top: 1rem; font-size: 1rem; }}
-  .author {{ margin: 0 .5rem; }}
-  .affiliations {{ font-size: .85rem; color: hsl(var(--muted-foreground)); padding-left: 1.5rem; margin-top: .5rem; }}
-  .abstract {{ background: hsl(var(--muted)); padding: 1.25rem; border-radius: .5rem; margin: 1.5rem 0; }}
-  hr {{ border: 0; border-top: 1px solid hsl(var(--border)); margin: 2rem 0; }}
-  iframe {{ background: white; }}
+  }
+  .authors { margin-top: 1rem; font-size: 1rem; }
+  .author { margin: 0 .5rem; }
+  .affiliations { font-size: .85rem; color: hsl(var(--muted-foreground)); padding-left: 1.5rem; margin-top: .5rem; }
+  .abstract { background: hsl(var(--muted)); padding: 1.25rem; border-radius: .5rem; margin: 1.5rem 0; }
+  hr { border: 0; border-top: 1px solid hsl(var(--border)); margin: 2rem 0; }
+  iframe { background: white; }
 </style>
-{custom_css_link}
 </head>
 <body>
   <div class="layout">
     {toc_html}
+    <div id="variation-panel">
+      <div class="prov-head">
+        <h3 class="prov-title">Variations</h3>
+        <button class="prov-close" type="button" onclick="toggleVariationPanel()">&times;</button>
+      </div>
+      <div id="variation-controls"></div>
+    </div>
+    <div class="gear-btn" onclick="toggleVariationPanel()" title="Settings">&#9881;</div>
     <div class="content">
-      {paper_header_html}
+      <header class="paper-header">
+        <div id="top" class="paper-title">{title}</div>
+        {authors_html}
+        {affiliations_html}
+      </header>
+
       {abstract_html}
 
       <main>
@@ -654,19 +759,19 @@ INDEX_TEMPLATE = """<!doctype html>
   <script>
     // KaTeX auto-render with our template's \\newcommand macros wired in
     const katexMacros = {katex_macros_json};
-    document.addEventListener("DOMContentLoaded", function () {{
-      renderMathInElement(document.body, {{
+    document.addEventListener("DOMContentLoaded", function () {
+      renderMathInElement(document.body, {
         delimiters: [
-          {{left: "$$", right: "$$", display: true}},
-          {{left: "\\\\[", right: "\\\\]", display: true}},
-          {{left: "$", right: "$", display: false}},
-          {{left: "\\\\(", right: "\\\\)", display: false}}
+          {left: "$$", right: "$$", display: true},
+          {left: "\\\\[", right: "\\\\]", display: true},
+          {left: "$", right: "$", display: false},
+          {left: "\\\\(", right: "\\\\)", display: false}
         ],
         macros: katexMacros,
         throwOnError: false,
         strict: "ignore"
-      }});
-    }});
+      });
+    });
 
     // Provenance side panel: click a variable to render its graph.
     const layout = document.querySelector(".layout");
@@ -675,225 +780,299 @@ INDEX_TEMPLATE = """<!doctype html>
     const panelClose = panel.querySelector(".prov-close");
     let activeVar = null;
 
-    function escapeHtml(s) {{
-      return String(s).replace(/[&<>"']/g, c => ({{
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
         "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-      }})[c]);
-    }}
+      })[c]);
+    }
 
-    function renderProvenance(data, varName, varFmt, displayValue) {{
-      const label = varFmt ? `${{varName}}:${{varFmt}}` : varName;
+    function renderProvenance(data, varName, varFmt, displayValue) {
+      const label = varFmt ? `${varName}:${varFmt}` : varName;
       const inputs = data.data && data.data.length ? data.data : [];
       const fullName = escapeHtml(label);
       const parts = [];
 
       // 1. Description as muted text (no background card)
-      if (data.description) {{
-        parts.push(`<p class="prov-description">${{escapeHtml(data.description)}}</p>`);
-      }}
+      if (data.description) {
+        parts.push(`<p class="prov-description">${escapeHtml(data.description)}</p>`);
+      }
 
       // 2. Graph: inputs -> command -> output variable
       let graphHtml = '<div class="prov-graph">';
-      if (inputs.length) {{
+      if (inputs.length) {
         graphHtml += '<div class="prov-node inputs">';
         graphHtml += '<span class="prov-label">inputs</span>';
-        graphHtml += '<ul>' + inputs.map(d => `<li>${{escapeHtml(d)}}</li>`).join("") + '</ul>';
+        graphHtml += '<ul>' + inputs.map(d => `<li>${escapeHtml(d)}</li>`).join("") + '</ul>';
         graphHtml += '</div>';
         graphHtml += '<div class="prov-arrow">&#8595;</div>';
-      }} else if (data.source) {{
+      } else if (data.source) {
         graphHtml += '<div class="prov-node inputs">';
         graphHtml += '<span class="prov-label">source</span>';
-        graphHtml += `<ul><li>${{escapeHtml(data.source)}}</li></ul>`;
+        graphHtml += `<ul><li>${escapeHtml(data.source)}</li></ul>`;
         graphHtml += '</div>';
         graphHtml += '<div class="prov-arrow">&#8595;</div>';
-      }}
-      if (data.command) {{
+      }
+      if (data.command) {
         graphHtml += '<div class="prov-node command">';
         graphHtml += '<span class="prov-label">command</span>';
         graphHtml += escapeHtml(data.command);
         graphHtml += '</div>';
         graphHtml += '<div class="prov-arrow">&#8595;</div>';
-      }}
+      }
       graphHtml += '<div class="prov-node output">';
       graphHtml += '<span class="prov-label">variable</span>';
-      graphHtml += `<span class="prov-output-name">${{fullName}}</span>`;
-      graphHtml += `<span class="prov-output-value">${{escapeHtml(displayValue)}}</span>`;
+      graphHtml += `<span class="prov-output-name">${fullName}</span>`;
+      graphHtml += `<span class="prov-output-value">${escapeHtml(displayValue)}</span>`;
       graphHtml += '</div></div>';
       parts.push(graphHtml);
 
       // 3. Updated timestamp right-aligned under the graph
-      if (data.updated) {{
-        parts.push(`<p class="prov-updated">updated ${{escapeHtml(data.updated)}}</p>`);
-      }}
+      if (data.updated) {
+        parts.push(`<p class="prov-updated">updated ${escapeHtml(data.updated)}</p>`);
+      }
 
       panelBody.innerHTML = parts.join("");
-    }}
+    }
 
-    function openProvenance(target) {{
+    function openProvenance(target) {
       if (activeVar) activeVar.classList.remove("var-active");
       activeVar = target;
       target.classList.add("var-active");
-      try {{
+      try {
         const data = JSON.parse(target.dataset.provenance);
         renderProvenance(data, target.dataset.var, target.dataset.fmt || "", target.textContent);
         layout.classList.add("prov-open");
         panel.setAttribute("aria-hidden", "false");
-      }} catch (err) {{ console.error(err); }}
-    }}
+      } catch (err) { console.error(err); }
+    }
 
-    function closeProvenance() {{
-      if (activeVar) {{
+    function closeProvenance() {
+      if (activeVar) {
         activeVar.classList.remove("var-active");
         activeVar = null;
-      }}
+      }
       layout.classList.remove("prov-open");
       panel.setAttribute("aria-hidden", "true");
-    }}
+    }
 
-    document.body.addEventListener("click", (e) => {{
+    document.body.addEventListener("click", (e) => {
       const target = e.target.closest(".var.var-has-provenance");
-      if (target) {{
+      if (target) {
         e.preventDefault();
-        if (activeVar === target) {{
+        if (activeVar === target) {
           closeProvenance();
-        }} else {{
+        } else {
           openProvenance(target);
-        }}
+        }
         return;
-      }}
+      }
       // Ignore clicks inside the panel itself
       if (e.target.closest(".provenance-panel")) return;
-    }});
+    });
 
     panelClose.addEventListener("click", closeProvenance);
-    document.addEventListener("keydown", (e) => {{
+    document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closeProvenance();
-    }});
+    });
 
     // Auto-resize interactive (Plotly / HTML) figures. Each embedded .html
     // figure has a tiny script injected at build time that posts its
     // content's scrollHeight back to us via postMessage. Works around
     // Chrome's file:// same-origin restrictions on contentDocument reads.
-    window.addEventListener("message", (e) => {{
+    window.addEventListener("message", (e) => {
       if (!e || !e.data || typeof e.data.latexBuilderFigureHeight !== "number") return;
       const h = e.data.latexBuilderFigureHeight;
-      // Cap at 90vh so a rogue figure can't take over the viewport.
-      const cap = Math.round(window.innerHeight * 0.9);
-      const clamped = Math.min(h, cap);
-      document.querySelectorAll("iframe.interactive-fig").forEach(iframe => {{
-        if (iframe.contentWindow === e.source) {{
-          iframe.style.height = clamped + "px";
+      
+      document.querySelectorAll("iframe.interactive-fig").forEach(iframe => {
+        if (iframe.contentWindow === e.source) {
+          // Get the current height of the iframe
+          const currentHeight = parseInt(iframe.style.height) || 0;
+          
+          // Circuit breaker: Only resize if the difference is greater than 5 pixels.
+          // This prevents infinite loops caused by minor fractional pixel adjustments.
+          if (Math.abs(currentHeight - h) > 5) {
+            iframe.style.height = h + "px"
         }}
-      }});
-    }});
+      });
+    });
 
     // Expand-to-modal for every figure. Adds a corner button on each
     // .figure-img / .figure-html / .figure-pdf; clicking opens a large modal
     // that mirrors the figure's content (img/iframe/embed) at viewport scale.
-    document.addEventListener("DOMContentLoaded", () => {{
+    document.addEventListener("DOMContentLoaded", () => {
       const expandIcon = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M16 9V4h-5M4 11v5h5M16 11v5h-5"/></svg>`;
       const figures = document.querySelectorAll(".figure-img, .figure-html, .figure-pdf");
-      figures.forEach((fig) => {{
+      figures.forEach((fig) => {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "fig-expand-btn";
         btn.setAttribute("aria-label", "Expand figure");
         btn.title = "Expand";
         btn.innerHTML = expandIcon;
-        btn.addEventListener("click", (e) => {{
+        btn.addEventListener("click", (e) => {
           e.preventDefault();
           openFigureModal(fig);
-        }});
+        });
         fig.appendChild(btn);
-      }});
+      });
 
       const backdrop = document.getElementById("fig-modal-backdrop");
       const body = document.getElementById("fig-modal-body");
       const caption = document.getElementById("fig-modal-caption");
       const closeBtn = document.getElementById("fig-modal-close");
 
-      function openFigureModal(fig) {{
+      function openFigureModal(fig) {
         body.innerHTML = "";
         // Prefer iframe (interactive), then img, then embed (pdf)
         const iframe = fig.querySelector("iframe");
         const img = fig.querySelector("img");
         const embed = fig.querySelector("embed");
         let node;
-        if (iframe) {{
+        if (iframe) {
           node = document.createElement("iframe");
           node.src = iframe.getAttribute("src");
           node.setAttribute("frameborder", "0");
-          node.setAttribute("scrolling", "no");
-        }} else if (img) {{
+          node.setAttribute("scrolling", "auto");
+        } else if (img) {
           node = document.createElement("img");
           node.src = img.getAttribute("src");
           node.alt = img.getAttribute("alt") || "";
-        }} else if (embed) {{
+        } else if (embed) {
           node = document.createElement("embed");
           node.src = embed.getAttribute("src");
           node.type = embed.getAttribute("type") || "application/pdf";
-        }} else {{
+        } else {
           return;
-        }}
+        }
         body.appendChild(node);
         const captionEl = fig.querySelector("figcaption, .caption");
         caption.textContent = captionEl ? captionEl.textContent.trim() : "";
         backdrop.classList.add("visible");
         backdrop.setAttribute("aria-hidden", "false");
         document.body.style.overflow = "hidden";
-      }}
+      }
 
-      function closeFigureModal() {{
+      function closeFigureModal() {
         backdrop.classList.remove("visible");
         backdrop.setAttribute("aria-hidden", "true");
         body.innerHTML = "";
         document.body.style.overflow = "";
-      }}
+      }
 
       closeBtn.addEventListener("click", closeFigureModal);
-      backdrop.addEventListener("click", (e) => {{
+      backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) closeFigureModal();
-      }});
-      document.addEventListener("keydown", (e) => {{
-        if (e.key === "Escape" && backdrop.classList.contains("visible")) {{
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && backdrop.classList.contains("visible")) {
           closeFigureModal();
-        }}
-      }});
+        }
+      });
 
       // Size-feedback for iframes inside the modal: reuse the same
       // postMessage protocol so the interactive figure matches the modal's
       // natural space.
-      window.addEventListener("message", (e) => {{
+      window.addEventListener("message", (e) => {
         if (!e || !e.data || typeof e.data.latexBuilderFigureHeight !== "number") return;
         const modalIframe = body.querySelector("iframe");
-        if (modalIframe && modalIframe.contentWindow === e.source) {{
+        if (modalIframe && modalIframe.contentWindow === e.source) {
           // In the modal we've already given the iframe 100% of the body,
           // so just let the iframe keep its size — no-op here, but the
           // handler above (outside the modal) will also fire and resize the
           // original figure as needed.
-        }}
-      }});
-    }});
+        }
+      });
+    });
+
+    function toggleVariationPanel() { document.getElementById('variation-panel').classList.toggle('open'); }
+    const variationState = {default_variations_json};
+    const variationsBySection = {};
+
+    function updateDynamicVariables() {
+      document.querySelectorAll('.var-has-variations').forEach(span => {
+        const data = JSON.parse(span.dataset.variations);
+        if (data.direct_mapping) {
+          span.textContent = variationState[data.direct_mapping] || "NA";
+          return;
+        }
+        const key = data.names.map(name => variationState[name] || "").join(',');
+        if (data.values[key] !== undefined) {
+          span.textContent = data.values[key];
+          span.classList.remove('var-undefined');
+        } else {
+          span.textContent = "NA";
+          span.classList.add('var-undefined');
+        }
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const allVars = document.querySelectorAll('.var-has-variations');
+      const controls = document.getElementById('variation-controls');
+      const varNames = new Set();
+
+      allVars.forEach(span => {
+        const data = JSON.parse(span.dataset.variations);
+        const names = data.direct_mapping ? [data.direct_mapping] : (data.names || []);
+        names.forEach(n => {
+           varNames.add(n);
+           if (variationState[n] === undefined) variationState[n] = "";
+        });
+      });
+
+      varNames.forEach(name => {
+        const group = document.createElement('div');
+        group.className = 'variation-group';
+        group.innerHTML = `<h4>${name}</h4><select class="var-select" data-var="${name}"><option value="">None</option></select>`;
+        const select = group.querySelector('select');
+        const values = new Set();
+        allVars.forEach(span => {
+          const d = JSON.parse(span.dataset.variations);
+          if (d.direct_mapping === name) {
+              // Direct mappings don't have a 'values' map in the same way,
+              // but we can infer the possible values from other variables
+              // that use this variation name.
+          }
+          if (d.names) {
+              const idx = d.names.indexOf(name);
+              if (idx !== -1) Object.keys(d.values).forEach(k => values.add(k.split(',')[idx]));
+          }
+        });
+        values.forEach(v => {
+          if (!v) return;
+          const opt = document.createElement('option');
+          opt.value = v; opt.textContent = v;
+          if (variationState[name] == v) opt.selected = true;
+          select.appendChild(opt);
+        });
+        select.onchange = (e) => {
+           variationState[name] = e.target.value;
+           updateDynamicVariables();
+        };
+        controls.appendChild(group);
+      });
+      updateDynamicVariables();
+    });
 
     // Scroll-spy: highlight the TOC entry matching the heading currently in view.
-    document.addEventListener("DOMContentLoaded", () => {{
+    document.addEventListener("DOMContentLoaded", () => {
       const tocLinks = Array.from(document.querySelectorAll(".toc a[href^='#']"));
       if (!tocLinks.length) return;
       const linksBySlug = new Map(tocLinks.map(a => [a.getAttribute("href").slice(1), a]));
       const headings = Array.from(document.querySelectorAll("main h1[id], main h2[id], main h3[id], main h4[id]"));
       if (!headings.length) return;
-      const observer = new IntersectionObserver((entries) => {{
-        entries.forEach(entry => {{
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
           const link = linksBySlug.get(entry.target.id);
           if (!link) return;
-          if (entry.isIntersecting) {{
+          if (entry.isIntersecting) {
             tocLinks.forEach(a => a.classList.remove("active"));
             link.classList.add("active");
-          }}
-        }});
-      }}, {{ rootMargin: "-40% 0px -55% 0px" }});
+          }
+        });
+      }, { rootMargin: "-40% 0px -55% 0px" });
       headings.forEach(h => observer.observe(h));
-    }});
+    });
   </script>
 </body>
 </html>
@@ -918,8 +1097,9 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     print(f'  Source: {src_dir}')
 
     manifest = Manifest(manifest_path)
-    processor = VariableProcessor(placeholder='XXXX')
+    processor = VariableProcessor(placeholder='XXXX', default_variations=manifest.default_variations)
     processor.variables.update(manifest.get_variable_values())
+    processor.load_external_data(src_dir, manifest.external_data)
     resolve = _build_resolve_variable(processor, manifest)
     bib_entries = load_bib(root_dir, version)
     citations = CitationCollector(bib_entries)
@@ -988,34 +1168,18 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
             print(f'  WARNING: section not found: {section_ref}')
             continue
         md_text = doc_path.read_text(encoding='utf-8')
-        # Expand {{tab:id}} tokens in the raw markdown before any other
-        # processing — md_to_html will then see a native pipe table.
-        from .manifest import expand_table_tokens
-        md_text = expand_table_tokens(md_text, manifest.tables, src_dir)
         md_text = _upgrade_figure_path(md_text)
         body = md_to_html(md_text, resolve, resolve_citation=citations.resolve, resolve_ref=resolve_ref)
         section_htmls.append(_render_section_html(body))
         if verbose:
             print(f'    Rendered: {section_ref}')
 
-    # Abstract + paper header — both gated on manifest.metadata.render so
-    # proposal-style docs can skip the auto-rendered front matter and start
-    # directly with sections.
+    # Abstract (if present), rendered as an inline markdown snippet
     abstract_html = ''
-    paper_header_html = ''
-    if manifest.metadata.render:
-        if manifest.metadata.abstract:
-            abs_body = md_to_html(manifest.metadata.abstract, resolve,
-                                  resolve_citation=citations.resolve)
-            abstract_html = f'<aside class="abstract"><h2>Abstract</h2>{abs_body}</aside>'
-        title_text = manifest.metadata.title or 'Manuscript'
-        paper_header_html = (
-            f'<header class="paper-header">'
-            f'<div id="top" class="paper-title">{title_text}</div>'
-            f'{_render_authors_html(manifest)}'
-            f'{_render_affiliations_html(manifest)}'
-            f'</header>'
-        )
+    if manifest.metadata.abstract:
+        abs_body = md_to_html(manifest.metadata.abstract, resolve,
+                              resolve_citation=citations.resolve)
+        abstract_html = f'<aside class="abstract"><h2>Abstract</h2>{abs_body}</aside>'
 
     # Bibliography section — appended after all cited sections so numbering
     # reflects first-appearance order (matches natbib unsrt convention).
@@ -1029,44 +1193,20 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     toc = _extract_toc(sections_joined)
     toc_html = _render_toc_html(toc)
 
-    # Custom CSS via manifest.metadata.html_styles. Bare names resolve to
-    # styles/<name>.css; explicit paths (with .css extension) are taken
-    # as-is. The file is copied next to index.html and linked via <link>
-    # after the built-in <style> so user rules win on cascade tie.
-    custom_css_link = ''
-    custom_css_src: Optional[Path] = None
-    if manifest.metadata.html_styles:
-        ref = manifest.metadata.html_styles
-        p = Path(ref)
-        if p.suffix.lower() == '.css':
-            cand = p if p.is_absolute() else (root_dir / p)
-        else:
-            cand = root_dir / 'styles' / f'{ref}.css'
-        if cand.exists():
-            custom_css_src = cand
-        else:
-            print(f'  WARNING: html_styles CSS not found: {cand}')
-
-    html = INDEX_TEMPLATE.format(
-        title=title,
-        paper_header_html=paper_header_html,
-        abstract_html=abstract_html,
-        sections_html=sections_joined,
-        toc_html=toc_html,
-        katex_macros_json=json.dumps(katex_macros),
-        custom_css_link=(f'<link rel="stylesheet" href="{custom_css_src.name}"/>'
-                         if custom_css_src else ''),
-    )
+    html = INDEX_TEMPLATE.replace("{title}", title) \
+                          .replace("{authors_html}", _render_authors_html(manifest)) \
+                          .replace("{affiliations_html}", _render_affiliations_html(manifest)) \
+                          .replace("{abstract_html}", abstract_html) \
+                          .replace("{sections_html}", sections_joined) \
+                          .replace("{toc_html}", toc_html) \
+                          .replace("{katex_macros_json}", json.dumps(katex_macros)) \
+                          .replace("{default_variations_json}", json.dumps(processor.default_variations))
 
     # Write output
     html_dir = root_dir / 'out' / version / 'html'
     html_dir.mkdir(parents=True, exist_ok=True)
     index_path = html_dir / 'index.html'
     index_path.write_text(html, encoding='utf-8')
-
-    if custom_css_src:
-        import shutil
-        shutil.copy2(custom_css_src, html_dir / custom_css_src.name)
 
     # Copy figures so <img>/<iframe> paths resolve. The copy plan flattens
     # subdirectories (figures/foo/foo.png → figures/foo.png) and crop_with_copy
@@ -1091,7 +1231,7 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
 
     # Post-process interactive (.html) figures: normalize Plotly exports
     # (multi-plot → tabbed layout) and inject the parent-side resize reporter.
-    # See src/document_sanity/plotly_html.py and docs/html-multi-plot-standard.md.
+    # See src/latex_builder/plotly_html.py and docs/html-multi-plot-standard.md.
     _normalize_plotly_html_figures(html_dir / 'figures', verbose=verbose)
 
     print(f'  HTML written: {index_path}')

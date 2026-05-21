@@ -50,9 +50,10 @@ _LATEX_FENCE_RE = re.compile(
 _CODE_FENCE_RE = re.compile(r'```(\w*)\s*\n(.*?)```', re.DOTALL)
 
 
-# Variable token: {{name}} or {{name:fmt}}. Match mixed-case identifiers
-# (some variables have lowercase segments like ..._AT_RS_eq_...).
-_VAR_RE = re.compile(r'\{\{([A-Za-z_][A-Za-z0-9_]*)(?::([^}]+))?\}\}')
+# Variable token: {{name}}, {{name:fmt}}, or {{op: expr :fmt}}.
+# Match mixed-case identifiers (some variables have lowercase segments like
+# ..._AT_RS_eq_...).
+_VAR_RE = re.compile(r'\{\{(op:\s*.+?|[A-Za-z_][A-Za-z0-9_]*)(?::([^}]+))?\}\}')
 
 
 # Image/link markdown
@@ -93,20 +94,27 @@ def _render_variable_span(name: str, fmt: Optional[str],
     """Return the <span> HTML for a {{VAR}} token.
 
     resolve_variable(name, fmt) must return (display_text, provenance_dict_or_None,
-    is_defined_bool).
+    is_defined_bool, variation_info_or_None).
     """
-    display, provenance, is_defined = resolve_variable(name, fmt)
+    display, provenance, is_defined, variation_info = resolve_variable(name, fmt)
     classes = ['var']
     if not is_defined:
         classes.append('var-undefined')
     if provenance:
         classes.append('var-has-provenance')
+    if variation_info:
+        classes.append('var-has-variations')
+
     attrs = [f'class="{" ".join(classes)}"', f'data-var="{_escape(name)}"']
     if fmt:
         attrs.append(f'data-fmt="{_escape(fmt)}"')
     if provenance:
         prov_json = json.dumps(provenance, ensure_ascii=True)
         attrs.append(f"data-provenance='{_html.escape(prov_json, quote=True)}'")
+    if variation_info:
+        var_json = json.dumps(variation_info, ensure_ascii=True)
+        attrs.append(f"data-variations='{_html.escape(var_json, quote=True)}'")
+
     return f'<span {" ".join(attrs)}>{_escape(display)}</span>'
 
 
@@ -139,7 +147,9 @@ def _convert_inline(text: str,
     def _protect_math(m: re.Match) -> str:
         content = m.group(0)
         def _math_var(vm: re.Match) -> str:
-            display, _, _ = resolve_variable(vm.group(1), vm.group(2))
+            name = vm.group(1).strip()
+            fmt = vm.group(2)
+            display, _, _, _ = resolve_variable(name, fmt)
             return _prettify_sci_in_math(display)
         content = _VAR_RE.sub(_math_var, content)
         content = _prettify_sci_in_math(content)
@@ -158,7 +168,9 @@ def _convert_inline(text: str,
 
     def _var_repl(m: re.Match) -> str:
         key = f'\x00V{counter[0]}\x00'
-        var_spans[key] = _render_variable_span(m.group(1), m.group(2), resolve_variable)
+        name = m.group(1).strip()
+        fmt = m.group(2)
+        var_spans[key] = _render_variable_span(name, fmt, resolve_variable)
         counter[0] += 1
         return key
     text = _VAR_RE.sub(_var_repl, text)

@@ -65,6 +65,7 @@ class ManuscriptBuilder:
             figures={fid: entry for fid, entry in self.manifest.figures.items()},
             figures_dir=self.src_dir / "figures",
             target="pdf",
+            default_variations=self.manifest.default_variations,
         )
 
     def _resolve_template(self) -> str:
@@ -160,6 +161,7 @@ class ManuscriptBuilder:
         print(f"\n  Loading variables...")
         values = self.manifest.get_variable_values()
         self.processor.variables.update(values)
+        self.processor.load_external_data(self.src_dir, self.manifest.external_data)
         print(f"    Loaded {len(values)} variables from manifest")
 
         n_prov = sum(1 for v in self.manifest.variables.values() if v.provenance)

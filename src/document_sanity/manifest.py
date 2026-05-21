@@ -86,6 +86,14 @@ class VariableEntry:
 
 
 @dataclass
+class ExternalDataEntry:
+    source: str
+    value_column: str
+    name_columns: list[str] = field(default_factory=list)
+    variation_columns: list[str] = field(default_factory=list)
+
+
+@dataclass
 class FigureEntry:
     """A figure definition with optional provenance.
 
@@ -305,6 +313,8 @@ class Manifest:
         self.variables: dict[str, VariableEntry] = {}
         self.figures: dict[str, FigureEntry] = {}
         self.tables: dict[str, TableEntry] = {}
+        self.external_data: list[ExternalDataEntry] = []
+        self.default_variations: dict[str, Any] = {}
 
         if manifest_path.exists():
             self._load()
@@ -319,6 +329,7 @@ class Manifest:
         self._parse_variables()
         self._parse_figures()
         self._parse_tables()
+        self._parse_external_data()
 
     def _parse_metadata(self) -> None:
         raw = self.raw.get('metadata', {})
@@ -533,3 +544,19 @@ class Manifest:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'w') as f:
             yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+    def _parse_external_data(self) -> None:
+        raw = self.raw.get('external_data', [])
+        if not isinstance(raw, list): raw = []
+        for entry in raw:
+            if not isinstance(entry, dict) or 'source' not in entry: continue
+            name_cols = entry.get('name_columns', [])
+            if isinstance(name_cols, str): name_cols = [name_cols]
+            var_cols = entry.get('variation_columns', [])
+            if isinstance(var_cols, str): var_cols = [var_cols]
+            self.external_data.append(ExternalDataEntry(
+                source=entry['source'], value_column=entry.get('value_column', 'Value'),
+                name_columns=name_cols, variation_columns=var_cols
+            ))
+        self.default_variations = self.raw.get('default_variations', {})
+        if not isinstance(self.default_variations, dict): self.default_variations = {}
