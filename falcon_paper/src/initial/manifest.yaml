@@ -27,9 +27,7 @@ metadata:
 #   _bibliography → inserts \bibliography{references} at this position
 #   _toc          → inserts \tableofcontents at this position
 sections:
-  - docs/main.md
-  - docs/falcon_overview.md
-  - docs/g_map_stats.md
+  - docs/contents.md
   - _bibliography
 
 external_data:
@@ -80,20 +78,15 @@ variables:
 # multiple formats exist the builder picks the best per target (PDF
 # prefers pdf, HTML prefers html, preview prefers png).
 figures:
-  example:
-    width: "\\textwidth"
-    # `source` is an optional explicit fallback — the builder will also
-    # auto-scan figures/example/ and pick the best match per target.
-    source: figures/example/example.png
   fig_1:
     width: "\\textwidth"
-    source: figures/fig_1.html
+    source: figures/fig_1
   fig_3:
     width: "\\textwidth"
-    source: figures/fig_3.html
+    source: figures/fig_3
   fig_4:
     width: "\\textwidth"
-    source: figures/fig_4.html
+    source: figures/fig_4
 
 # Tables declared here are copied to the output. You can also inline
 # tables inside ```latex blocks directly in the markdown docs.
