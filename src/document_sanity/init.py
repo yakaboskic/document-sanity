@@ -110,6 +110,7 @@ sections:
 #       command: "python scripts/extract_metric.py --metric accuracy"
 #       description: "Model accuracy on held-out test set"
 variables:
+  NUM_SAMPLES: 1000
   SAMPLE_SIZE: 1000
   PVALUE:
     value: 0.001
@@ -139,8 +140,8 @@ STARTER_INTRO = """\
 This is the introduction to your paper. You can use **bold**, *italic*,
 and `inline code` formatting.
 
-Reference variables like this: we analyzed {{{{SAMPLE_SIZE}}}} samples
-and found a significant effect ($p = {{{{PVALUE}}}}$).
+Reference variables like this: we analyzed {{SAMPLE_SIZE}} samples
+and found a significant effect ($p = {{PVALUE}}$).
 
 ## Background
 
@@ -148,7 +149,7 @@ Write your background here. You can include:
 
 - Bullet points
 - With **formatted** text
-- And {{{{VARIABLE}}}} references
+- And {{VARIABLE}} references
 
 ## Related Work
 
