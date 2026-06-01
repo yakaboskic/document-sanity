@@ -406,6 +406,17 @@ class ManuscriptBuilder:
         The final PDF is moved into the pdf/ dir.
         """
         print(f"\n  Compiling to PDF...")
+
+        # Check if compiler exists
+        if not shutil.which(self.compiler):
+            print(f"\n  Error: LaTeX compiler '{self.compiler}' not found.")
+            print(f"  To build PDFs, you need a LaTeX distribution installed.")
+            print(f"  Installation steps:")
+            print(f"    - macOS: brew install --cask mactex-no-gui")
+            print(f"    - Ubuntu/Debian: sudo apt-get install texlive-latex-extra texlive-fonts-recommended")
+            print(f"    - Windows: Install MiKTeX (https://miktex.org/) or TeX Live")
+            return False
+
         self.out_pdf_dir.mkdir(parents=True, exist_ok=True)
 
         main_name = "main"

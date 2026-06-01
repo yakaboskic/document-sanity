@@ -78,6 +78,14 @@ class WordBuilder:
             target="word",
         )
 
+    def load_variables(self) -> None:
+        """Load variables from the manifest and external data."""
+        print(f"\n  Loading variables...")
+        values = self.manifest.get_variable_values()
+        self.processor.variables.update(values)
+        self.processor.load_external_data(self.src_dir, self.manifest.external_data)
+        print(f"    Loaded {len(values)} variables from manifest")
+
     # ---- resolution helpers --------------------------------------------
 
     def _resolve_template(self) -> Path:
@@ -291,10 +299,7 @@ class WordBuilder:
         styles = self._resolve_styles(template_path)
 
         # Variables
-        print("\n  Loading variables...")
-        values = self.manifest.get_variable_values()
-        self.processor.variables.update(values)
-        print(f"    Loaded {len(values)} variables from manifest")
+        self.load_variables()
 
         # Assemble document
         doc = TemplateDocument(TemplateDocumentConfig(
