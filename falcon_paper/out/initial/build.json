@@ -1,0 +1,15 @@
+{
+  "version": "initial",
+  "built_at": "2026-06-01T14:43:41.360754",
+  "template": "article",
+  "sections": [
+    "docs/main.md",
+    "docs/falcon_overview.md",
+    "docs/g_map_stats.md",
+    "_bibliography"
+  ],
+  "variables_count": 4,
+  "variables_with_provenance": 2,
+  "figures_count": 4,
+  "tables_count": 0
+}

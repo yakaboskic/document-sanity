@@ -1,0 +1,42 @@
+\section{The HUGEST- Map}
+\label{sec:map}
+
+To provide a catalog of human genetic support, we constructed the Genetic Map (G-Map) by applying FALCON on 1,370 bottom-line traits from the Knowledge Portal[cite] across 19,427 genes. The map establishes 208,854 Strong trait-gene associations, defined by a probability threshold of 0.34 based on the Jeffreys Scale with a 5.0% prior[cite].
+
+On average, individual traits are Strong associated with 152 genes. Conversely, 16,333 genes possess at least one Strong trait association, with 1,848 of these genes being associated with exactly one.
+
+The network encompasses 118,177 distinct loci. The map identifies the nearest gene as the top candidate (the gene with the highest probability in the locus) on 73.38% of loci; replicating other studies ([stacy], [Mountjoy]). When examining gene associations for each locus, the majority 52.24% are associated with a single gene (Fig. 3d).
+
+Using relative success rate[cite], we calculated that genes with Strong genetic support from the G-Map are 3.50 times more likely to possess a functional drug target. Compared to the 2.70 rate from the baseline nearest-gene approach, this represents a 29.63% improvement.
+
+Using the curated list of effector genes in [Constanzo] and clinical information from open targets, The G-Map identified 203,214 novel gene-trait associations with and average of 148 novel genes per trait. From the subset of associations with no clinical trials, 16,380 have approved drug targets for the associated gene, making them prime candidates for rapid clinical repurposing. Dynamic Figure 3 and Figure 4.
+
+By integrating the curated list of effector genes from [Constanzo] with clinical data from Open Targets, we systematically categorized the G-Map associations to funnel associations from established therapeutics down to novel discoveries. Within the clinical space, the network captures 1,555 established gene-trait associations. Expanding beyond active clinical trials into translational opportunities, we identified 16,380 associations involving genes with approved drug targets for other indications, rendering them prime candidates for rapid clinical repurposing. Finally, filtering the network for strictly uncharacterized targets uncovers an expansive frontier of 203,214 novel gene-trait associations, driven by an average of 148 novel genes per trait.
+
+\section{Coverage}
+\label{sec:coverage}
+To evaluate trait representation in the G-Map across established phenotypes, we performed a coverage analysis using the Mondo Disease Ontology [cite]. We employed PubMedBERT to calculate semantic similarity, mapping G-Map trait names directly to ontology terms. Applying a similarity threshold of 0.5 at level 3 of the ontology yielded a match success rate of 94.59% and an overall trait coverage of 57.58%. Within this setup, each trait mapped to an average of 2.3 ontology terms, resulting in a total of 2,972 mappings on 1294 unique traits. Furthermore, the semantic similarity scores for these matched traits had a median of 0.74 (IQR, 0.66–0.84).
+
+Analysis of the matched terms revealed distinct patterns in trait representation across the ontology. The categories exhibiting the highest proportional coverage were acute stress disorder and perinatal disease (both at 50%). In terms of absolute frequency, the most heavily represented categories within the G-Map included diseases of genetic or genomic mechanisms (609), nervous system disorders (296), and metabolic diseases (215).
+
+\section{Overview of genetic architecture}
+\label{sec:gen_arch}
+To accurately capture the underlying genetic architecture and mitigate the redundancy and low power in GWAS cohorts, it is necessary to evaluate these associations through a bias-adjusted framework. Raw association counts often inflate genetic signals; thus, correcting for this bias is essential to represent a more accurate biological distribution of pleiotropy and polygenicity. By filtering out noise, this bias adjusted analysis shows the biologically active hubs across established clinical therapeutics, repurposable targets and novel discoveries.
+
+The complete, bias corrected G-Map encompasses a network of 16,290 unique genes mapped across 1,152 distinct phenotypic traits, exhibiting a broad pleiotropy (N=7,393) where genes associate with an average of 1.5 traits. The map contains pleiotropic master regulators, with the most dominant genetic signals emerging from PBX2, NOTCH4, and TSBP1 (the three of them with ~40 Strong associated traits). Phenotypically, global genetic burden is driven by undetermined stroke etiology (toastUNDETER; 1,872), complex lean mass phenotypes (TB-LM; 1,815), and platelet volume (PlatVol; 1,692). Consequently, the broadest categorical signals across the entire G-Map are deeply concentrated within hematological (17,223), musculoskeletal (4,575), and renal (4,177) domains.
+
+Funneling this global architecture into the clinically validated space, the network captures 490 established therapeutic targets driving 299 distinct clinical phenotypes. The G-Map highlights a strong clinical inclination toward chronic inflammatory and structural conditions, where top genes: TUBB (4.42), TNF (2.78), and NR3C1 (2.69), and traits: ankylosing spondylitis (6.18), chronic obstructive pulmonary disease (COPD; 5.69), and TB-LM (4.84), modulate microtubule dynamics, systemic inflammation, and glucocorticoid signaling. Expanding beyond established indications, the repurposable class identifies [total|Genes\_Repurposable] genes and [total|Traits\_Repurposable] traits, providing a baseline for immediate translational opportunities. In this repurposable context, the strongest gene candidates are heavily anchored in immune regulation and the major histocompatibility complex, led by HLA-DRB1 (36.01), AGER (32.28), and HLA-DRB5 (30.43). The phenotypic signals and categories driving these repurposable opportunities closely mirror the global baseline.
+
+Finally, filtering the map for novel associations uncovers [total|Genes\_Novel] uncharted biological hubs across [total|Traits\_Novel] distinct traits that have yet to be therapeutically exploited. Within this novel tier, the most dominant genes—PBX2 (40.57), NOTCH4 (40.56), and C6orf10 (40.09)—are identical to the global leaders, emphasizing that the bulk of the network’s untapped pleiotropic potential resides in these developmental and immune-linked loci. The driving traits for these novel discoveries continue to be toastUNDETER (1,872.67), TB-LM (1,810.87), and PlatVol (1,692.64). This alignment firmly establishes the hematological (17,209.32), musculoskeletal (4,467.65), and renal (3,942.39) domains as the primary categories for new target discovery.
+
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_3.html}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_4.html}
+\end{figure}
+

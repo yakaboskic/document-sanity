@@ -1,0 +1,29 @@
+[project]
+# TEMPLATE: rename `document-builder-template` to your paper's slug after
+# clicking "Use this template" on GitHub.
+name = "document-builder-template"
+version = "0.1.0"
+description = "Manuscript built with latex-builder."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}            # TEMPLATE: adjust or remove
+
+# latex-builder is the only runtime dependency. Pulled from GitHub main so
+# you always get the latest conventions; pin to a tag or commit hash if you
+# want a stable build (e.g. `@v0.2.0` or `@abc1234`).
+dependencies = [
+    "latex-builder @ git+https://github.com/yakaboskic/latex-builder.git@main",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Required for the `git+` direct reference to resolve.
+[tool.hatch.metadata]
+allow-direct-references = true
+
+# This repo has no importable Python — it's purely manuscript content that
+# consumes the latex-builder CLI. Skip hatchling's src-tree autodetection.
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
