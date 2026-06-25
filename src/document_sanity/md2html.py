@@ -330,8 +330,22 @@ def _convert_inline(text: str,
                     f'<embed src="{_escape(src)}" type="application/pdf" '
                     f'class="w-full min-h-[500px] rounded-lg border"/>'
                     f'<p class="caption">{_escape(alt)}</p></div>')
+        # `alt` is an HTML attribute, so it cannot carry the rich caption:
+        # variable/math/etc. placeholders are restored to tags (e.g.
+        # <span class="var ...">) after this pass, and their embedded quotes
+        # would terminate the attribute early (spilling the caption into the
+        # page body). Resolve placeholders to tag-stripped plain text and
+        # neutralize quotes for the attribute; the full caption still renders
+        # in the <figcaption> below.
+        _resolve = {**store, **var_spans}
+        alt_attr = re.sub(
+            r'\x00[VMCRLKTA]\d+\x00',
+            lambda mm: _html.escape(
+                re.sub(r'<[^>]+>', '', _resolve.get(mm.group(0), '')), quote=True),
+            alt,
+        ).replace('"', '&quot;')
         return (f'<figure class="figure-img">'
-                f'<img src="{_escape(src)}" alt="{_escape(alt)}"{title_attr} '
+                f'<img src="{_escape(src)}" alt="{alt_attr}"{title_attr} '
                 f'class="mx-auto max-w-full rounded-lg"/>'
                 f'<figcaption class="caption">{_escape(alt)}</figcaption></figure>')
     text = _IMAGE_RE.sub(_img, text)
