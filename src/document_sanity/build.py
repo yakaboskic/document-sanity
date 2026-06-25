@@ -132,6 +132,13 @@ class ManuscriptBuilder:
             return ''
 
         abstract = self.manifest.metadata.abstract.strip()
+        # A file-sourced abstract (abstract: docs/abstract.md) is markdown, so
+        # convert it to LaTeX the same way sections are (escape_text=False for
+        # LaTeX pass-through) before variable substitution. An inline string is
+        # left as raw LaTeX for back-compat.
+        if self.manifest.metadata.abstract_source:
+            from .md2latex import md_to_latex
+            _, abstract = md_to_latex(abstract, escape_text=False)
         # Process variables in abstract
         abstract = self.processor.replace_variables(abstract, 'manifest.yaml:abstract')
 

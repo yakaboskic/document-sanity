@@ -284,6 +284,12 @@ class Metadata:
     authors: list[AuthorInfo] = field(default_factory=list)
     affiliations: dict[int, dict] = field(default_factory=dict)
     abstract: Optional[str] = None
+    # When the manifest's `abstract:` is a bare path to a markdown file
+    # (e.g. `abstract: docs/abstract.md`), `abstract` holds the loaded file
+    # content and `abstract_source` holds the original path. Builders use this
+    # flag to know the content is markdown (and so convert it for LaTeX) and to
+    # round-trip the pointer rather than inlining the body on save().
+    abstract_source: Optional[str] = None
     keywords: list[str] = field(default_factory=list)
     template: str = "article"
     word_template: Optional[str] = None   # .docx template stem (optional)
@@ -352,11 +358,14 @@ class Manifest:
         for k, v in raw.get('affiliations', {}).items():
             affiliations[int(k)] = v if isinstance(v, dict) else {'name': str(v)}
 
+        abstract, abstract_source = self._resolve_abstract(raw.get('abstract'))
+
         self.metadata = Metadata(
             title=raw.get('title'),
             authors=authors,
             affiliations=affiliations,
-            abstract=raw.get('abstract'),
+            abstract=abstract,
+            abstract_source=abstract_source,
             keywords=raw.get('keywords', []),
             template=raw.get('template', 'article'),
             word_template=raw.get('word_template'),
@@ -365,6 +374,28 @@ class Manifest:
             render=raw.get('render', True),
             document_class=raw.get('document_class'),
         )
+
+    def _resolve_abstract(self, value: Any) -> tuple[Optional[str], Optional[str]]:
+        """Resolve the manifest `abstract:` value.
+
+        Returns (abstract_content, abstract_source). When the value is a bare
+        single-line path to a markdown file (ends in `.md` and resolves to a
+        file next to the manifest), the file content is loaded and the original
+        path is returned as the source. Otherwise the value is passed through
+        verbatim as an inline string (source is None). A `.md`-looking path that
+        does not resolve to a file is left inline with a warning, so the typo
+        shows up in the output rather than crashing the build.
+        """
+        if not isinstance(value, str):
+            return value, None
+        candidate = value.strip()
+        if '\n' not in value and candidate.endswith('.md'):
+            src = self.path.parent / candidate
+            if src.is_file():
+                return src.read_text(encoding='utf-8'), candidate
+            print(f"    WARNING: abstract file not found: {candidate} "
+                  f"(resolved to {src}); treating as inline text")
+        return value, None
 
     def _parse_sections(self) -> None:
         self.sections = self.raw.get('sections', [])
@@ -453,7 +484,10 @@ class Manifest:
                 meta['authors'].append(entry)
         if self.metadata.affiliations:
             meta['affiliations'] = self.metadata.affiliations
-        if self.metadata.abstract:
+        if self.metadata.abstract_source:
+            # Preserve the file pointer rather than inlining the loaded body.
+            meta['abstract'] = self.metadata.abstract_source
+        elif self.metadata.abstract:
             meta['abstract'] = self.metadata.abstract
         if self.metadata.keywords:
             meta['keywords'] = self.metadata.keywords
