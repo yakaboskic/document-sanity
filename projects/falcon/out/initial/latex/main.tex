@@ -1,0 +1,48 @@
+% latex-builder article template
+% Insertion points are marked with %%LATEX_BUILDER: comments — the builder
+% substitutes title/authors/abstract/content/bibliography on build.
+%
+% Replace this file (or add siblings like `nature.tex`) for a different
+% journal style; `manifest.metadata.template: <name>` in manifest.yaml
+% selects which file is used.
+
+\documentclass[11pt, a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{natbib}
+
+%% Example custom math macro — define your own here.
+%% `latex-builder preview` will expand \prob to \text{Pr} inside $...$ math
+%% so GitHub's KaTeX preview renders correctly without the custom command.
+\newcommand{\prob}{\text{Pr}}
+
+
+
+\begin{document}
+
+\title{FALCON: A unified model of direct genetic support}
+\author{Alejandro Llamas\textsuperscript{1} \and Second Author\textsuperscript{1,2}}
+\date{\textsuperscript{1}Department of Research, Example University  \\  \textsuperscript{2}Department of Collaboration, Partner Institute}
+
+\begin{abstract}
+Genome-wide association studies identify thousands of variant-trait associations, yet localizing true effector genes and resolving biological pleiotropy remains confounded by systemic cohort biases and linkage disequilibrium. Here, we present FALCON, a unified probabilistic model of direct genetic support, to construct the Genetic Map (G-Map)—a comprehensive, bias-adjusted catalog of human gene-trait associations. By correcting for redundant cohort signals, the G-Map reveals the true distribution of systemic pleiotropy across thousands of phenotypes. We systematically categorize this global genetic architecture into established clinical targets, rapid repurposing opportunities, and strictly novel discoveries. Our analysis highlights heavily burdened biological networks, demonstrating that developmental and immune-linked loci function as highly versatile pleiotropic hubs. By mapping the genetic basis of human disease from validated therapeutics to uncharted biological frontiers, the G-Map provides a robust, highly tractable foundation for novel target prioritization and drug repurposing.
+\end{abstract}
+\textbf{Keywords:} GWAS, Drug repurposing, Genetic architecture
+
+\input{sections/contents.tex}
+
+\bibliography{references}
+
+
+
+
+\end{document}

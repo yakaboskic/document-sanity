@@ -1,0 +1,13 @@
+{
+  "version": "initial",
+  "built_at": "2026-07-15T10:29:37.612932",
+  "template": "article",
+  "sections": [
+    "docs/contents.md",
+    "_bibliography"
+  ],
+  "variables_count": 4,
+  "variables_with_provenance": 2,
+  "figures_count": 3,
+  "tables_count": 0
+}

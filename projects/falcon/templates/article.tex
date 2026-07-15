@@ -1,0 +1,40 @@
+% latex-builder article template
+% Insertion points are marked with %%LATEX_BUILDER: comments — the builder
+% substitutes title/authors/abstract/content/bibliography on build.
+%
+% Replace this file (or add siblings like `nature.tex`) for a different
+% journal style; `manifest.metadata.template: <name>` in manifest.yaml
+% selects which file is used.
+
+\documentclass[11pt, a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{natbib}
+
+%% Example custom math macro — define your own here.
+%% `latex-builder preview` will expand \prob to \text{Pr} inside $...$ math
+%% so GitHub's KaTeX preview renders correctly without the custom command.
+\newcommand{\prob}{\text{Pr}}
+
+%%LATEX_BUILDER:PACKAGES
+
+\begin{document}
+
+%%LATEX_BUILDER:TITLE
+
+%%LATEX_BUILDER:ABSTRACT
+
+%%LATEX_BUILDER:CONTENT
+
+%%LATEX_BUILDER:BIBLIOGRAPHY
+
+\end{document}

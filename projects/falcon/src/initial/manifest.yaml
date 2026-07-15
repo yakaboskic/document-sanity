@@ -1,0 +1,93 @@
+# Manifest for this version of the manuscript. One YAML file drives the
+# whole build: metadata, section ordering, variables (with provenance),
+# figures, and tables.
+
+metadata:
+  title: "FALCON: A unified model of direct genetic support"
+  authors:
+    - name: "Alejandro Llamas"
+      email: "first.author@example.edu"
+      affiliations: [1]
+    - name: "Second Author"
+      email: "second.author@example.edu"
+      affiliations: [1, 2]
+  affiliations:
+    1:
+      department: "Department of Research"
+      institution: "Example University"
+    2:
+      department: "Department of Collaboration"
+      institution: "Partner Institute"
+  abstract: |
+    Genome-wide association studies identify thousands of variant-trait associations, yet localizing true effector genes and resolving biological pleiotropy remains confounded by systemic cohort biases and linkage disequilibrium. Here, we present FALCON, a unified probabilistic model of direct genetic support, to construct the Genetic Map (G-Map)—a comprehensive, bias-adjusted catalog of human gene-trait associations. By correcting for redundant cohort signals, the G-Map reveals the true distribution of systemic pleiotropy across thousands of phenotypes. We systematically categorize this global genetic architecture into established clinical targets, rapid repurposing opportunities, and strictly novel discoveries. Our analysis highlights heavily burdened biological networks, demonstrating that developmental and immune-linked loci function as highly versatile pleiotropic hubs. By mapping the genetic basis of human disease from validated therapeutics to uncharted biological frontiers, the G-Map provides a robust, highly tractable foundation for novel target prioritization and drug repurposing.
+  keywords: [GWAS, Drug repurposing, Genetic architecture]
+  template: article            # loads templates/article.tex
+
+# Order in which sections render. Pseudo-sections:
+#   _bibliography → inserts \bibliography{references} at this position
+#   _toc          → inserts \tableofcontents at this position
+sections:
+  - docs/contents.md
+  - _bibliography
+
+external_data:
+  - source: data/g_map.csv
+    value_column: Value
+    name_columns: [Correction, Type, Stat, Metric]
+    variation_columns: [BayesFactorCat, Prior]
+  - source: data/thresholds.csv
+    value_column: Threshold
+    name_columns: [Metric]
+    variation_columns: [BayesFactorCat, Prior]
+default_variations:
+  BayesFactorCat: "Strong"
+  Prior: "5.0"
+
+# Variables referenced from markdown with {{NAME}} or {{NAME:fmt}} syntax.
+# Two forms: `NAME: value` is the simple form; the full form adds a
+# `provenance:` block that powers the HTML viewer's side panel.
+variables:
+  # Simple form — just a value.
+  falcon_RS_cat: 3.5
+  BL_NG_RS: 2.7
+
+  # Full form — value plus provenance. Click this variable in the HTML
+  # viewer to see the graph.
+  PVAL:
+    value: 0.0087
+    provenance:
+      description: >
+        P-value of the primary hypothesis test (two-sided), after
+        Benjamini–Hochberg adjustment across 12 tested phenotypes.
+      source: data/analysis_results.parquet
+      data:
+        - data/raw_measurements.csv
+        - data/phenotype_metadata.tsv
+      command: python scripts/primary_test.py --out data/analysis_results.parquet
+      updated: "2026-04-21"
+
+  R2:
+    value: 0.87
+    provenance:
+      description: Coefficient of determination from the fitted regression model.
+      source: data/analysis_results.parquet
+      command: python scripts/primary_test.py --out data/analysis_results.parquet
+      updated: "2026-04-21"
+
+# Figures are resolved from src/<ver>/figures/<id>/<id>.{ext}. When
+# multiple formats exist the builder picks the best per target (PDF
+# prefers pdf, HTML prefers html, preview prefers png).
+figures:
+  fig_1:
+    width: "\\textwidth"
+    source: figures/fig_1
+  fig_3:
+    width: "\\textwidth"
+    source: figures/fig_3
+  fig_4:
+    width: "\\textwidth"
+    source: figures/fig_4
+
+# Tables declared here are copied to the output. You can also inline
+# tables inside ```latex blocks directly in the markdown docs.
+tables: {}
