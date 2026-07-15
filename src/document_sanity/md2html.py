@@ -358,10 +358,10 @@ def _convert_inline(text: str,
     text = _LINK_RE.sub(_lnk, text)
 
     # bold+italic ***...***
-    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text)
-    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text, flags=re.DOTALL)
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
     # italic *...*
-    text = re.sub(r'(?<!\w)\*([^*\n]+)\*(?!\w)', r'<em>\1</em>', text)
+    text = re.sub(r'(?<!\w)\*(.+?)\*(?!\w)', r'<em>\1</em>', text, flags=re.DOTALL)
 
     # 7. Restore protected placeholders. Inner items (variables) may be nested
     # inside outer items (math), so restore OUTER first, then iterate both until
@@ -375,6 +375,9 @@ def _convert_inline(text: str,
                 changed = True
         if not changed:
             break
+
+    # 8. Convert literal newlines to <br/> tags to preserve formatting
+    text = text.replace('\n', '<br/>\n')
 
     return text
 
@@ -468,7 +471,7 @@ def md_to_html(md_content: str,
         stripped = line.strip()
 
         if not stripped:
-            out.append('')
+            out.append('<br/>')
             i += 1
             continue
 
@@ -548,7 +551,7 @@ def md_to_html(md_content: str,
                 quote_lines.append(lines[i].strip().lstrip('>').strip())
                 i += 1
             out.append('<blockquote>'
-                       + _convert_inline(' '.join(quote_lines), resolve_variable,
+                       + _convert_inline('\n'.join(quote_lines), resolve_variable,
                                          resolve_citation=resolve_citation,
                                          resolve_ref=resolve_ref)
                        + '</blockquote>')
@@ -560,7 +563,7 @@ def md_to_html(md_content: str,
             para_lines.append(lines[i].strip())
             i += 1
         if para_lines:
-            out.append(f'<p>{_convert_inline(" ".join(para_lines), resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</p>')
+            out.append(f'<p>{_convert_inline("\n".join(para_lines), resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</p>')
             continue
         i += 1
 

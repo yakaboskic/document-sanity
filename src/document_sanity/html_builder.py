@@ -1208,6 +1208,12 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     index_path = html_dir / 'index.html'
     index_path.write_text(html, encoding='utf-8')
 
+    # Write available variables
+    vars_list = processor.get_all_available_variables()
+    vars_out_path = root_dir / 'out' / version / 'available_variables.txt'
+    vars_out_path.write_text("\n".join(vars_list), encoding='utf-8')
+    print(f'  Available variables written: {vars_out_path}')
+
     # Copy figures so <img>/<iframe> paths resolve. The copy plan flattens
     # subdirectories (figures/foo/foo.png → figures/foo.png) and crop_with_copy
     # trims vertical whitespace from raster images unless the manifest opts out.

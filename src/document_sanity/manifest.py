@@ -45,9 +45,12 @@ Table formats:
 """
 
 import yaml
+import logging
 from pathlib import Path
 from typing import Any, Optional
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -137,12 +140,22 @@ class FigureEntry:
 # which is not in the default template. So .svg is deprioritized below .png
 # for pdf and listed last as a desperate fallback.
 TARGET_PREFERENCES: dict[str, tuple[str, ...]] = {
-    'pdf':     ('pdf', 'png', 'jpg', 'jpeg', 'eps', 'svg'),
-    'html':    ('html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'pdf'),
+    'pdf':     ('pdf', 'svg', 'png', 'jpg'),
+    'html':    ('html', 'pdf', 'svg', 'png', 'jpg'),
     'preview': ('png', 'jpg', 'jpeg', 'svg'),
-    # Word embeds raster only — DOCX lacks native PDF/SVG support.
-    'word':    ('png', 'jpg', 'jpeg', 'gif', 'bmp'),
+    'word':    ('png', 'jpg'),
 }
+
+
+def _find_file_with_extensions(p: Path, prefs: tuple[str, ...]) -> Optional[Path]:
+    """Try to find a file by adding/replacing extensions from prefs."""
+    if p.exists():
+        return p
+    for ext in prefs:
+        candidate = p.with_suffix(f'.{ext}')
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def resolve_figure(entry: FigureEntry, target: str,
@@ -151,11 +164,11 @@ def resolve_figure(entry: FigureEntry, target: str,
 
     Resolution order:
       1. If `entry.formats[target]` is set, use it (absolute or relative to
-         figures_dir's parent — whichever resolves on disk).
+         figures_dir's parent). Supports extension searching if not found.
       2. If a directory `figures_dir / <id>/` exists, pick the first file
          matching the target's preference order whose stem equals the figure id.
       3. If `entry.source` is set, return it (resolved against figures_dir's
-         parent). The legacy flat-path fallback.
+         parent). Supports extension searching if not found.
       4. None.
     """
     prefs = TARGET_PREFERENCES.get(target, TARGET_PREFERENCES['pdf'])
@@ -166,8 +179,9 @@ def resolve_figure(entry: FigureEntry, target: str,
         p = Path(entry.formats[target])
         if not p.is_absolute():
             p = (src_root / p).resolve()
-        if p.exists():
-            return p
+        found = _find_file_with_extensions(p, prefs)
+        if found:
+            return found
 
     # (2) directory layout: figures/<id>/<id>.<ext>
     fig_dir = figures_dir / entry.id
@@ -186,11 +200,22 @@ def resolve_figure(entry: FigureEntry, target: str,
         p = Path(entry.source)
         if not p.is_absolute():
             p = (src_root / p).resolve()
-        if p.exists():
-            return p
-        # As a last resort return the unresolved path so callers can emit
-        # a placeholder or a broken link for visibility.
-        return p
+        found = _find_file_with_extensions(p, prefs)
+        if found:
+            return found
+
+        logger.warning(f"Figure not found: {entry.source}")
+        # As a last resort return the path without extension so callers can
+        # emit a placeholder or a broken link for visibility.
+        return p.with_suffix('')
+
+    # Last resort fallback if formats was set but nothing found at all
+    if target in entry.formats:
+        p = Path(entry.formats[target])
+        if not p.is_absolute():
+            p = (src_root / p).resolve()
+        logger.warning(f"Figure not found for target '{target}': {entry.formats[target]}")
+        return p.with_suffix('')
 
     return None
 

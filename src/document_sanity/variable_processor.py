@@ -96,9 +96,18 @@ class VariableProcessor:
                     self._process_rows(data, config)
 
     def _process_rows(self, rows, config):
+        def is_na(val: Any) -> bool:
+            """Check if a value represents 'Not Available'."""
+            if val is None:
+                return True
+            s = str(val).strip().lower()
+            return s in ("", "na", "n/a", "nan", "null")
+
         for row in rows:
             # Construct name from only columns that have values (not "NA")
-            name_parts = [str(row[c]) for c in config.name_columns if str(row[c]) != "NA"]
+            name_parts = [str(row[c]) for c in config.name_columns if not is_na(row[c])]
+            if not name_parts:
+                continue
             name = "_".join(name_parts)
 
             if name in self.variables:
@@ -125,10 +134,14 @@ class VariableProcessor:
             if not config.variation_columns:
                 vars_info["global_value"] = val
             else:
-                variation_vals = [str(row[c]) for c in config.variation_columns]
-                if all(v == "NA" for v in variation_vals):
+                # We need to distinguish between a row that has NO variation columns
+                # and a row where variation columns ARE present but are all NA.
+                is_all_na_variation = all(is_na(row[c]) for c in config.variation_columns)
+
+                if is_all_na_variation:
                     vars_info["global_value"] = val
                 else:
+                    variation_vals = ["" if is_na(row[c]) else str(row[c]) for c in config.variation_columns]
                     key = tuple(variation_vals)
                     vars_info["variations"][key] = val
 
@@ -309,6 +322,13 @@ class VariableProcessor:
         processed = self.replace_variables(content, str(input_path))
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(processed, encoding='utf-8')
+
+    def get_all_available_variables(self) -> list[str]:
+        """Get a sorted list of all available variable names."""
+        all_vars = set(self.variables.keys())
+        all_vars.update(self.external_vars.keys())
+        all_vars.update(self.default_variations.keys())
+        return sorted(all_vars)
 
     def get_unused_variables(self) -> list[str]:
         """Get list of variables defined but never used."""

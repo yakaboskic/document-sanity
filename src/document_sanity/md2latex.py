@@ -71,7 +71,8 @@ def _escape_latex(text: str) -> str:
     """Escape special LaTeX characters, but preserve template variables {{...}}."""
     # First, protect template variables
     protected = []
-    parts = re.split(r'(\{\{[^}]+\}\})', text)
+    # Pattern to match {{VAR}} or {{VAR:fmt}}, allowing for optional spaces and complex fmt
+    parts = re.split(r'(\{\{.+?\}\})', text)
     for part in parts:
         if part.startswith('{{') and part.endswith('}}'):
             protected.append(part)
@@ -99,7 +100,8 @@ def _convert_inline(text: str, escape: bool = True) -> str:
     Preserves {{variable}} template syntax.
     """
     # Protect template variables from processing
-    var_pattern = r'\{\{[^}]+\}\}'
+    # Pattern to match {{VAR}} or {{VAR:fmt}}, allowing for optional spaces and complex fmt
+    var_pattern = r'\{\{.+?\}\}'
     placeholders = {}
     counter = [0]
 
@@ -200,10 +202,20 @@ def _convert_inline(text: str, escape: bool = True) -> str:
     else:
         # In no-escape mode, still escape chars that are unsafe in running LaTeX
         # but have no special meaning in markdown: _, &, #
+        # We must protect template variables during this process.
         parts = re.split(r'(\x00(?:VAR|MATH|CMD)\d+\x00)', text)
         escaped = []
         for part in parts:
             if part in placeholders or part in math_placeholders or part in cmd_placeholders:
+                # If it's a template variable placeholder, we must also escape
+                # characters like _ inside it because it will be restored and
+                # then processed by VariableProcessor. However, md2latex is
+                # called with escape_text=False in convert_sections, and then
+                # the result is written to a .tex file, and THEN
+                # VariableProcessor.replace_variables is called on the .tex.
+                # If we have {{NUM_SAMPLES}}, it becomes {{NUM\_SAMPLES}},
+                # and VariableProcessor won't find it.
+                # So we should ONLY escape outside of placeholders.
                 escaped.append(part)
             else:
                 # Escape unescaped _, &, # (leave \_ \& \# as-is)

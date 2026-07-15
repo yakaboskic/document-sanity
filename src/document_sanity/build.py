@@ -413,6 +413,17 @@ class ManuscriptBuilder:
         The final PDF is moved into the pdf/ dir.
         """
         print(f"\n  Compiling to PDF...")
+
+        # Check if compiler exists
+        if not shutil.which(self.compiler):
+            print(f"\n  Error: LaTeX compiler '{self.compiler}' not found.")
+            print(f"  To build PDFs, you need a LaTeX distribution installed.")
+            print(f"  Installation steps:")
+            print(f"    - macOS: brew install --cask mactex-no-gui")
+            print(f"    - Ubuntu/Debian: sudo apt-get install texlive-latex-extra texlive-fonts-recommended")
+            print(f"    - Windows: Install MiKTeX (https://miktex.org/) or TeX Live")
+            return False
+
         self.out_pdf_dir.mkdir(parents=True, exist_ok=True)
 
         main_name = "main"
@@ -459,6 +470,13 @@ class ManuscriptBuilder:
         else:
             print(f"    PDF generation failed")
             return False
+
+    def write_available_variables(self) -> None:
+        """Write a list of all available variables to available_variables.txt."""
+        vars_list = self.processor.get_all_available_variables()
+        out_path = self.out_dir / "available_variables.txt"
+        out_path.write_text("\n".join(vars_list), encoding='utf-8')
+        print(f"    Available variables written: {out_path}")
 
     def generate_build_log(self) -> None:
         """Write a build metadata log."""
@@ -507,6 +525,7 @@ class ManuscriptBuilder:
         self.copy_figures()
         self.copy_tables()
         self.copy_supporting_files()
+        self.write_available_variables()
         self.generate_build_log()
 
         # Report
