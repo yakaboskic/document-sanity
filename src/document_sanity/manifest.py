@@ -140,10 +140,11 @@ class FigureEntry:
 # which is not in the default template. So .svg is deprioritized below .png
 # for pdf and listed last as a desperate fallback.
 TARGET_PREFERENCES: dict[str, tuple[str, ...]] = {
-    'pdf':     ('pdf', 'svg', 'png', 'jpg'),
-    'html':    ('html', 'pdf', 'svg', 'png', 'jpg'),
+    'pdf':     ('pdf', 'png', 'jpg', 'jpeg', 'eps', 'svg'),
+    'html':    ('html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'pdf'),
     'preview': ('png', 'jpg', 'jpeg', 'svg'),
-    'word':    ('png', 'jpg'),
+    # Word embeds raster only — DOCX lacks native PDF/SVG support.
+    'word':    ('png', 'jpg', 'jpeg', 'gif', 'bmp'),
 }
 
 

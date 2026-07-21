@@ -110,7 +110,6 @@ sections:
 #       command: "python scripts/extract_metric.py --metric accuracy"
 #       description: "Model accuracy on held-out test set"
 variables:
-  NUM_SAMPLES: 1000
   SAMPLE_SIZE: 1000
   PVALUE:
     value: 0.001

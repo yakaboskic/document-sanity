@@ -357,11 +357,17 @@ def _convert_inline(text: str,
         return f'<a href="{_escape(u)}"{title_attr}>{_escape(t)}</a>'
     text = _LINK_RE.sub(_lnk, text)
 
+    # Emphasis is bounded to a single line. Paragraphs reach this function as
+    # their source lines joined by '\n' (step 8 turns those into <br/>), so
+    # WITHOUT this bound a stray single '*' would let a non-greedy match run
+    # across line breaks and swallow everything up to the next loose asterisk
+    # into one <em>. Keeping '.' newline-insensitive (no re.DOTALL) confines
+    # bold spans to a line; the italic class excludes '\n' explicitly.
     # bold+italic ***...***
-    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text, flags=re.DOTALL)
-    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
+    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text)
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
     # italic *...*
-    text = re.sub(r'(?<!\w)\*(.+?)\*(?!\w)', r'<em>\1</em>', text, flags=re.DOTALL)
+    text = re.sub(r'(?<!\w)\*([^*\n]+)\*(?!\w)', r'<em>\1</em>', text)
 
     # 7. Restore protected placeholders. Inner items (variables) may be nested
     # inside outer items (math), so restore OUTER first, then iterate both until
