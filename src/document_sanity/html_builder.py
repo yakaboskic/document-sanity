@@ -71,8 +71,13 @@ def _compute_figures_copy_plan(src_dir: Path, html_dir: Path) -> list[tuple[Path
     dest_figs = html_dir / 'figures'
     pairs = []
     for f in src_figs.rglob('*'):
-        if f.is_file():
-            pairs.append((f, dest_figs / f.name))
+        if not f.is_file():
+            continue
+        # figures/<id>/assets/ holds draw.io source assets — inputs to the
+        # composed figure, not build artifacts.
+        if 'assets' in f.relative_to(src_figs).parts[:-1]:
+            continue
+        pairs.append((f, dest_figs / f.name))
     return pairs
 
 
@@ -290,8 +295,11 @@ def _make_resolve_ref(labels: dict[str, tuple[str, int]]):
     """Build a (key) -> (display, href) callable for md_to_html's resolve_ref."""
     def _resolve(key: str) -> tuple:
         if key in labels:
-            kind, num = labels[key]
-            return f'{kind} {num}', f'#{key}'
+            # Return the number alone (hyperlinked), matching LaTeX \ref, which
+            # emits just the number. The prose supplies the noun ("Section",
+            # "Figure"), so returning "Section N" here would double it.
+            _, num = labels[key]
+            return f'{num}', f'#{key}'
         return key, f'#{key}'
     return _resolve
 
@@ -474,6 +482,14 @@ INDEX_TEMPLATE = """<!doctype html>
   code { background: hsl(var(--muted)); padding: 0.1rem 0.35rem; border-radius: .25rem; font-size: 0.9em; }
   pre { background: hsl(var(--muted)); padding: 1rem; border-radius: .5rem; overflow-x: auto; }
   blockquote { border-left: 3px solid hsl(var(--border)); padding-left: 1rem; color: hsl(var(--muted-foreground)); margin: 1rem 0; }
+  /* Prose lists. Scoped to .paper-section so Tailwind's preflight (which resets
+     list-style/padding) is overridden for body content without touching the
+     TOC, references, or provenance lists that intentionally have no markers. */
+  .paper-section ul, .paper-section ol { margin: 1rem 0; padding-left: 1.6rem; }
+  .paper-section ul { list-style: disc; }
+  .paper-section ol { list-style: decimal; }
+  .paper-section li { margin: .35rem 0; padding-left: .2rem; }
+  .paper-section li::marker { color: hsl(var(--muted-foreground)); }
   figure { margin: 3rem 0; text-align: center; }
   figure img { display: inline-block; max-width: 100%; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
   figure figcaption, .figure-html .caption, .figure-pdf .caption {

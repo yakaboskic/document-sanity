@@ -8,11 +8,13 @@ Commands:
   new-version    Create a new version from an existing one
   import         Import an existing LaTeX project into src/ format
   convert        Convert a single markdown file to LaTeX (or vice versa)
+  drawio         Sync/compose draw.io figures with re-importable source assets
 """
 
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional
 
 
 def cmd_init(args: argparse.Namespace) -> int:
@@ -380,6 +382,146 @@ def cmd_convert(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_drawio_target(target: str, root: str,
+                           version: Optional[str]) -> Optional[Path]:
+    """Resolve a `drawio` subcommand target: a .drawio path or a figure id."""
+    p = Path(target)
+    if p.suffix == '.drawio' or p.exists():
+        if not p.exists():
+            print(f"  Error: File not found: {p}", file=sys.stderr)
+            return None
+        return p.resolve()
+
+    from .build import find_latest_version
+
+    root_dir = Path(root).resolve()
+    if version is None:
+        try:
+            version = find_latest_version(root_dir)
+            print(f"  Auto-detected version: {version}")
+        except ValueError as e:
+            print(f"  Error: {e}", file=sys.stderr)
+            return None
+    candidate = root_dir / "src" / version / "figures" / target / f"{target}.drawio"
+    if not candidate.exists():
+        print(f"  Error: No .drawio file for figure '{target}': {candidate}",
+              file=sys.stderr)
+        return None
+    return candidate
+
+
+def cmd_drawio(args: argparse.Namespace) -> int:
+    """Sync/compose draw.io figures with re-importable source assets."""
+    from . import drawio_fig
+
+    if args.drawio_command == 'sync':
+        drawio_path = _resolve_drawio_target(args.target, args.root, args.version)
+        if drawio_path is None:
+            return 1
+
+        try:
+            results = drawio_fig.sync_file(drawio_path, force=args.force)
+        except ValueError as e:
+            print(f"  Error: {e}", file=sys.stderr)
+            return 1
+        if not results:
+            print("  No managed assets found (add ds-source attributes via "
+                  "Edit Data, or use `drawio add-asset`)")
+        failed = False
+        for r in results:
+            print(f"  [{r.action}] {r.asset_id}")
+            for w in r.warnings:
+                print(f"    ! {w}")
+            if r.action in ('missing-source', 'error'):
+                failed = True
+
+        png_path = drawio_path.with_suffix('.png')
+        if args.no_export:
+            if not png_path.exists():
+                print(f"  Note: no exported {png_path.name} exists yet — builds "
+                      f"will not pick up this figure until you export")
+        else:
+            if drawio_fig.export_png(drawio_path, png_path, app=args.app):
+                print(f"  Exported: {png_path}")
+            else:
+                failed = True
+        return 1 if failed else 0
+
+    if args.drawio_command == 'add-asset':
+        drawio_path = Path(args.drawio_path).resolve()
+        if not drawio_path.exists():
+            print(f"  Error: File not found: {drawio_path}", file=sys.stderr)
+            return 1
+        src_path = drawio_fig.resolve_source(args.source, drawio_path)
+        if src_path is None:
+            print(f"  Error: Source image not found: {args.source}", file=sys.stderr)
+            return 1
+
+        crop = None
+        if args.crop:
+            try:
+                crop = tuple(int(v) for v in args.crop.split(','))
+                if len(crop) != 4:
+                    raise ValueError
+            except ValueError:
+                print(f"  Error: --crop must be 'x,y,w,h' integers", file=sys.stderr)
+                return 1
+        at = (40.0, 40.0)
+        if args.at:
+            try:
+                x, y = (float(v) for v in args.at.split(','))
+                at = (x, y)
+            except ValueError:
+                print(f"  Error: --at must be 'x,y'", file=sys.stderr)
+                return 1
+
+        try:
+            root = drawio_fig.load_mxfile(drawio_path.read_text(encoding='utf-8'))
+            asset = drawio_fig.add_asset(
+                root, args.source, src_path,
+                crop=crop, at=at, width=args.width, page_index=args.page,
+            )
+            drawio_path.write_text(drawio_fig.serialize_mxfile(root), encoding='utf-8')
+        except (ValueError, RuntimeError) as e:
+            print(f"  Error: {e}", file=sys.stderr)
+            return 1
+        print(f"  Added asset '{asset.cell_id}' ({args.source}) to {drawio_path.name}")
+        print(f"  Next: massage layout in draw.io, then `document-sanity drawio sync`")
+        return 0
+
+    if args.drawio_command == 'status':
+        drawio_path = _resolve_drawio_target(args.target, args.root, args.version)
+        if drawio_path is None:
+            return 1
+        try:
+            root = drawio_fig.load_mxfile(drawio_path.read_text(encoding='utf-8'))
+            assets = drawio_fig.find_assets(root)
+        except ValueError as e:
+            print(f"  Error: {e}", file=sys.stderr)
+            return 1
+        if not assets:
+            print("  No managed assets found")
+            return 0
+        stale = False
+        for asset in assets:
+            status = drawio_fig.asset_status(asset, drawio_path)
+            print(f"  [{status}] {asset.cell_id} <- {asset.source}")
+            if status != 'fresh':
+                stale = True
+        png_path = drawio_path.with_suffix('.png')
+        if not png_path.exists():
+            print(f"  [missing] exported {png_path.name}")
+            stale = True
+        elif png_path.stat().st_mtime < drawio_path.stat().st_mtime:
+            print(f"  [stale] exported {png_path.name} is older than the .drawio")
+            stale = True
+        return 1 if stale else 0
+
+    print("  Error: specify a drawio subcommand (sync, add-asset, status)",
+          file=sys.stderr)
+    return 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="document-sanity",
@@ -479,6 +621,40 @@ def main() -> None:
     conv_p.add_argument('--preserve-comments', action='store_true',
                        help='Keep LaTeX comments as HTML comments (tex2md)')
 
+    # --- drawio ---
+    drawio_p = subparsers.add_parser(
+        "drawio", help="Sync/compose draw.io figures with re-importable source assets")
+    drawio_sub = drawio_p.add_subparsers(dest="drawio_command")
+
+    sync_p = drawio_sub.add_parser(
+        "sync", help="Re-import source assets from current .drawio state and export PNG")
+    sync_p.add_argument('target', help='Path to a .drawio file, or a figure id')
+    sync_p.add_argument('--root', '-r', default='.', help='Project root directory')
+    sync_p.add_argument('--version', '-V', help='Version (default: auto-detect latest)')
+    sync_p.add_argument('--no-export', action='store_true',
+                        help='Skip the draw.io PNG export step')
+    sync_p.add_argument('--force', action='store_true',
+                        help='Re-embed assets even when the source hash is unchanged')
+    sync_p.add_argument('--app', help='Path to the draw.io binary (or set $DRAWIO_APP)')
+
+    addp_p = drawio_sub.add_parser(
+        "add-asset", help="Import a source image as a managed, re-syncable asset")
+    addp_p.add_argument('drawio_path', help='Path to the .drawio file')
+    addp_p.add_argument('--source', required=True,
+                        help='Source image path (stored as ds-source, resolved '
+                             'relative to the .drawio file)')
+    addp_p.add_argument('--crop', help="Crop rect 'x,y,w,h' in source pixel coords")
+    addp_p.add_argument('--at', help="Position 'x,y' in diagram coords (default 40,40)")
+    addp_p.add_argument('--width', type=float,
+                        help='Display width in diagram units (height from aspect)')
+    addp_p.add_argument('--page', type=int, default=0, help='Page index (default 0)')
+
+    status_p = drawio_sub.add_parser(
+        "status", help="Check asset/export freshness (exit 1 if anything stale)")
+    status_p.add_argument('target', help='Path to a .drawio file, or a figure id')
+    status_p.add_argument('--root', '-r', default='.', help='Project root directory')
+    status_p.add_argument('--version', '-V', help='Version (default: auto-detect latest)')
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -494,6 +670,7 @@ def main() -> None:
         'html': cmd_html,
         'word': cmd_word,
         'convert': cmd_convert,
+        'drawio': cmd_drawio,
     }
 
     handler = handlers.get(args.command)

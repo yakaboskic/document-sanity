@@ -341,6 +341,10 @@ class ManuscriptBuilder:
         n_copied = n_cropped = 0
         for ext in ['*.png', '*.jpg', '*.jpeg', '*.pdf', '*.eps', '*.svg']:
             for fig in figures_src.rglob(ext):
+                # figures/<id>/assets/ holds draw.io source assets — inputs to
+                # the composed figure, not build artifacts.
+                if 'assets' in fig.relative_to(figures_src).parts[:-1]:
+                    continue
                 dest = figures_dest / fig.name
                 crop = crop_by_stem.get(fig.stem, True)
                 mode, info = copy_with_crop(fig, dest, crop=crop)

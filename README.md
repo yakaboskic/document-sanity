@@ -20,6 +20,8 @@ GitHub/VSCode/Obsidian previews.
 | `document-sanity new-version` | Copied `src/<ver>/` | Snapshot today's version from the previous one. |
 | `document-sanity init <name>` | Fresh project scaffold | Start a new manuscript project from scratch. |
 | `document-sanity convert file.md/.tex` | The other format | One-off md↔tex conversion (useful for scripting). |
+| `document-sanity drawio sync <fig-id>` | Refreshed `figures/<id>/<id>.png` | Re-import regenerated source assets into a draw.io-composed figure (crop/position recorded in the .drawio XML) and re-export the PNG. See [docs/drawio-figures.md](docs/drawio-figures.md). |
+| `document-sanity drawio status <fig-id>` | Exit 1 if stale | CI-friendly staleness check for composed figures. |
 
 ## Documentation
 

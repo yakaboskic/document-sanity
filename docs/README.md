@@ -7,6 +7,7 @@ deeper into the design decisions the tool makes on your behalf.
 | Topic | What's opinionated |
 |---|---|
 | [Figures](./figures.md) | Per-figure subdirectories (`figures/<id>/<id>.{pdf,png,html,...}`), target-specific artifact resolution (PDF prefers `.pdf`, HTML prefers `.html`, Word prefers `.png`/`.jpg`), automatic whitespace cropping on raster figures during build. |
+| [draw.io composed figures](./drawio-figures.md) | Multi-panel figures composed in draw.io with re-importable source assets: import/crop transforms stored as `ds-*` attributes in the .drawio XML, `drawio sync` re-imports regenerated asset PNGs while preserving manual layout, committed PNG export feeds the normal build. |
 | [Word output](./word.md) | `.docx` template discovery, style extraction from `styles.xml` + `theme1.xml`, body-preserving splice that keeps headers/footers/theme intact, inline figure embedding, `\cite{}` → `[N]` with a References section. |
 | [References & labels](./references-and-labels.md) | Label prefix convention (`fig:`, `tab:`, `eq:`, `sec:`, `app:`, `alg:`) drives automatic numbering and "Figure 3" / "Table 2" hyperlink text in the HTML viewer. |
 | [Preview blocks](./preview-blocks.md) | `<!-- document-sanity:preview:begin hash=… -->` auto-generated markdown-renderable approximations of ```latex figures / tables / math, keyed by a hash of the source block. |

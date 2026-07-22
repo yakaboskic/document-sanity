@@ -521,23 +521,32 @@ def md_to_html(md_content: str,
             i += 1
             continue
 
-        # Unordered list
+        # Unordered list. Each item may span several soft-wrapped source lines;
+        # fold the continuation lines (non-blank, not a new marker or block) into
+        # the item so wrapped list entries render as one <li> instead of breaking
+        # the list apart.
         if re.match(r'^[-*+]\s', stripped):
             out.append('<ul>')
             while i < n and re.match(r'^\s*[-*+]\s', lines[i]):
-                item = re.sub(r'^\s*[-*+]\s+', '', lines[i])
-                out.append(f'<li>{_convert_inline(item, resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</li>')
+                item_lines = [re.sub(r'^\s*[-*+]\s+', '', lines[i]).strip()]
                 i += 1
+                while i < n and lines[i].strip() and not _is_block_start(lines[i]):
+                    item_lines.append(lines[i].strip())
+                    i += 1
+                out.append(f'<li>{_convert_inline(" ".join(item_lines), resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</li>')
             out.append('</ul>')
             continue
 
-        # Ordered list
+        # Ordered list (same soft-wrap folding as the unordered case).
         if re.match(r'^\d+\.\s', stripped):
             out.append('<ol>')
             while i < n and re.match(r'^\s*\d+\.\s', lines[i]):
-                item = re.sub(r'^\s*\d+\.\s+', '', lines[i])
-                out.append(f'<li>{_convert_inline(item, resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</li>')
+                item_lines = [re.sub(r'^\s*\d+\.\s+', '', lines[i]).strip()]
                 i += 1
+                while i < n and lines[i].strip() and not _is_block_start(lines[i]):
+                    item_lines.append(lines[i].strip())
+                    i += 1
+                out.append(f'<li>{_convert_inline(" ".join(item_lines), resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</li>')
             out.append('</ol>')
             continue
 
@@ -557,7 +566,7 @@ def md_to_html(md_content: str,
                 quote_lines.append(lines[i].strip().lstrip('>').strip())
                 i += 1
             out.append('<blockquote>'
-                       + _convert_inline('\n'.join(quote_lines), resolve_variable,
+                       + _convert_inline(' '.join(quote_lines), resolve_variable,
                                          resolve_citation=resolve_citation,
                                          resolve_ref=resolve_ref)
                        + '</blockquote>')
@@ -569,7 +578,11 @@ def md_to_html(md_content: str,
             para_lines.append(lines[i].strip())
             i += 1
         if para_lines:
-            out.append(f'<p>{_convert_inline("\n".join(para_lines), resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</p>')
+            # Join soft-wrapped source lines with a space (standard markdown
+            # collapses single newlines within a paragraph) so prose reflows to
+            # the page width instead of preserving the source line breaks, and so
+            # emphasis spanning a wrap boundary still matches.
+            out.append(f'<p>{_convert_inline(" ".join(para_lines), resolve_variable, resolve_citation=resolve_citation, resolve_ref=resolve_ref)}</p>')
             continue
         i += 1
 

@@ -3,6 +3,9 @@
 `document-sanity` chooses the right figure artifact per build target and
 auto-crops whitespace from raster images during output.
 
+For multi-panel figures composed in draw.io with re-importable source
+assets, see [draw.io composed figures](./drawio-figures.md).
+
 ## Directory layout
 
 ```
