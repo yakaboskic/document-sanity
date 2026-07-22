@@ -477,7 +477,18 @@ def md_to_html(md_content: str,
         stripped = line.strip()
 
         if not stripped:
-            out.append('<br/>')
+            # Headings provide their own margins. Skip every blank line in a
+            # run adjacent to a heading so HTML does not add empty rows.
+            next_content = i + 1
+            while next_content < n and not lines[next_content].strip():
+                next_content += 1
+            previous_is_heading = bool(out and re.match(r'^<h[1-6]\b', out[-1]))
+            next_is_heading = bool(
+                next_content < n
+                and re.match(r'^#{1,6}\s+', lines[next_content].strip())
+            )
+            if not previous_is_heading and not next_is_heading:
+                out.append('<br/>')
             i += 1
             continue
 
