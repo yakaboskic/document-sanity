@@ -3,3 +3,8 @@ __pycache__/
 .idea
 .DS_Store
 .venv
+.env
+.vscode
+.codex/
+.pytest_cache/
+.claude/
