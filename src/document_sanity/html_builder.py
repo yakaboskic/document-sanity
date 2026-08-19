@@ -476,6 +476,15 @@ INDEX_TEMPLATE = """<!doctype html>
   .paper-section:first-of-type { margin-top: 0; }
   .paper-section > h1:first-child,
   .paper-section > h2:first-child { margin-top: 0; }
+  .abstract,
+  .content p,
+  .content li,
+  .content figcaption,
+  .content th,
+  .content td {
+    text-align: justify;
+    text-justify: inter-word;
+  }
   p { margin: .75rem 0; }
   a { color: hsl(var(--accent)); text-decoration: none; }
   a:hover { text-decoration: underline; }

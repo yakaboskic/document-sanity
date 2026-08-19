@@ -80,7 +80,7 @@ class ManuscriptBuilder:
 
         return template_path.read_text(encoding='utf-8')
 
-    def _build_title_block(self) -> str:
+    def _build_title_block(self, template_text: str = "") -> str:
         """Generate LaTeX title/author/affiliation block from manifest metadata.
 
         If the template already contains \\maketitle, we don't add it again.
@@ -120,9 +120,14 @@ class ManuscriptBuilder:
                 sep = '  \\\\  '
                 lines.append('\\date{' + sep.join(affil_lines) + '}')
 
+        # Add \maketitle if missing from template, except for nature template
+        # which needs it after the abstract.
+        if template_name != 'nature' and '\\maketitle' not in template_text:
+            lines.append('\\maketitle')
+
         return '\n'.join(lines)
 
-    def _build_abstract_block(self) -> str:
+    def _build_abstract_block(self, template_text: str = "") -> str:
         """Generate LaTeX abstract block.
 
         Uses \\abstract{} for sn-jnl class (nature template),
@@ -153,6 +158,10 @@ class ManuscriptBuilder:
             if self.manifest.metadata.keywords:
                 kw = ', '.join(self.manifest.metadata.keywords)
                 lines.append(f'\\keywords{{{kw}}}')
+
+            # sn-jnl needs \maketitle after abstract/keywords
+            if '\\maketitle' not in template_text:
+                lines.append('\\maketitle')
         else:
             lines.append('\\begin{abstract}')
             lines.append(abstract)
@@ -253,8 +262,8 @@ class ManuscriptBuilder:
         # %%DOCUMENT_SANITY:TITLE / :ABSTRACT insertion points empty so
         # the template's own front matter (or none) takes effect.
         if self.manifest.metadata.render:
-            title_block = self._build_title_block()
-            abstract_block = self._build_abstract_block()
+            title_block = self._build_title_block(template)
+            abstract_block = self._build_abstract_block(template)
         else:
             title_block = ''
             abstract_block = ''
