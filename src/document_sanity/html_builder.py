@@ -34,6 +34,7 @@ from .variable_processor import VariableProcessor
 from .md2html import md_to_html
 from .bib import load_bib, render_entry_html, BibEntry
 from .figure_crop import copy_with_crop, pillow_available
+from .labels import collect_labels
 
 
 def _normalize_plotly_html_figures(figures_dir: Path, verbose: bool = False) -> None:
@@ -249,46 +250,6 @@ class CitationCollector:
             + '\n'.join(items)
             + '</ol></section>'
         )
-
-
-_LABEL_RE = __import__('re').compile(r'\\label\{([^{}]+)\}')
-
-# Prefix → display name for cross-references. "fig:xyz" → "Figure 3".
-_LABEL_KIND_NAMES = {
-    'fig': 'Figure',
-    'tab': 'Table',
-    'eq': 'Eq.',
-    'sec': 'Section',
-    'eqn': 'Eq.',
-    'app': 'Appendix',
-    'alg': 'Algorithm',
-}
-
-
-def _collect_labels(manifest, src_dir: Path) -> dict[str, tuple[str, int]]:
-    """Walk every section doc, find \\label{key}s in document order, and
-    assign numbers by kind (fig/tab/eq/...). Returns {key: (kind_name, number)}.
-
-    Used to render \\ref{key} as "Figure 3" / "Table 2" with working #anchors."""
-    counters: dict[str, int] = {}
-    labels: dict[str, tuple[str, int]] = {}
-    pseudo = {'_bibliography', '_toc'}
-    for section_ref in manifest.sections:
-        if section_ref in pseudo:
-            continue
-        doc_path = src_dir / section_ref
-        if not doc_path.exists():
-            continue
-        content = doc_path.read_text(encoding='utf-8')
-        for m in _LABEL_RE.finditer(content):
-            key = m.group(1)
-            if key in labels:
-                continue  # duplicate label, keep first
-            prefix = key.split(':', 1)[0] if ':' in key else 'sec'
-            kind = _LABEL_KIND_NAMES.get(prefix, 'Section')
-            counters[prefix] = counters.get(prefix, 0) + 1
-            labels[key] = (kind, counters[prefix])
-    return labels
 
 
 def _make_resolve_ref(labels: dict[str, tuple[str, int]]):
@@ -1131,7 +1092,7 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     if verbose:
         print(f'  Loaded {len(bib_entries)} bibliography entries')
 
-    labels = _collect_labels(manifest, src_dir)
+    labels = collect_labels(manifest, src_dir)
     resolve_ref = _make_resolve_ref(labels)
     if verbose:
         print(f'  Indexed {len(labels)} label(s) for cross-references')

@@ -14,6 +14,9 @@ Pass-through ```latex fences:
   - If no preview block is present and the fence contains `\\includegraphics`,
     we extract the image path + caption and emit an embedded figure.
   - Otherwise the fence is dropped.
+  - A labeled figure's caption is numbered the way LaTeX numbers it
+    ("Figure 2: ..."), and \\ref{key} renders as that number. The caller
+    passes the label map from labels.collect_labels.
 
 Citations (\\cite{key}) register with the builder via register_citation() and
 render as "[N]" inline; the caller emits the References section separately.
@@ -49,10 +52,20 @@ _REF_RE = re.compile(r"\\(?:ref|eqref|pageref|autoref|nameref)\{([^{}]+)\}")
 _LABEL_RE = re.compile(r"\\label\{([^{}]+)\}")
 _IMAGE_MD_RE = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)(?:\s+\"([^\"]*)\")?\)")
 _LINK_MD_RE = re.compile(r"(?<!\!)\[([^\]]+)\]\(([^)\s]+)(?:\s+\"([^\"]*)\")?\)")
+# A ```latex fence immediately followed by its preview block. The body may not
+# contain ``` so a fence without a preview can't swallow a later fence's preview.
+_FENCE_THEN_PREVIEW_RE = re.compile(
+    r"^```latex[ \t]*\n((?:(?!```)[\s\S])*?)^```[ \t]*$\s*"
+    r"<!--\s*(?:document-sanity|latex-builder):preview:begin[^>]*-->\s*(.*?)"
+    r"\s*<!--\s*(?:document-sanity|latex-builder):preview:end\s*-->",
+    re.MULTILINE | re.DOTALL,
+)
 
 
 FigureResolver = Callable[[str], Optional[Path]]
 CitationHandler = Callable[[str], int]
+# {label key: (kind name, number)}, e.g. {"fig:arch": ("Figure", 2)}
+Labels = dict[str, tuple[str, int]]
 
 
 @dataclass
@@ -61,6 +74,7 @@ class RenderContext:
     figure_resolver: Optional[FigureResolver] = None
     figures_dir: Optional[Path] = None
     section_path: str = ""
+    labels: Optional[Labels] = None
 
 
 # ---- entry point -----------------------------------------------------------
@@ -72,6 +86,7 @@ def render_markdown(
     figure_resolver: Optional[FigureResolver] = None,
     figures_dir: Optional[Path] = None,
     section_path: str = "",
+    labels: Optional[Labels] = None,
 ) -> None:
     """Render a markdown document into the given ContentBuilder."""
     ctx = RenderContext(
@@ -79,7 +94,21 @@ def render_markdown(
         figure_resolver=figure_resolver,
         figures_dir=figures_dir,
         section_path=section_path,
+        labels=labels,
     )
+
+    # 0. A fence with a preview block renders from the preview alone (its
+    #    labels only number the caption); rendering both duplicated figures.
+    def _prefer_preview(m: re.Match) -> str:
+        prefix = _caption_prefix(m.group(1), ctx)
+        preview = m.group(2)
+        if prefix:
+            preview = _IMAGE_MD_RE.sub(
+                lambda im: f"![{prefix}{im.group(1)}]({im.group(2)})", preview, count=1
+            )
+        return f"\n{preview}\n"
+
+    md = _FENCE_THEN_PREVIEW_RE.sub(_prefer_preview, md)
 
     # 1. Replace ```latex blocks with a sentinel that we'll handle in the
     #    block loop. Preserves order relative to surrounding markdown.
@@ -283,6 +312,8 @@ def _render_latex_figure(inner: str, ctx: RenderContext) -> None:
     #   1. {{fig:id}} token -> resolve via figure_resolver(id)
     #   2. \includegraphics[...]{path}
     caption = _extract_latex_caption(inner) or ""
+    if caption:
+        caption = _caption_prefix(inner, ctx) + caption
 
     fig_token = re.search(r"\{\{fig:([A-Za-z0-9_]+)\}\}", inner)
     path: Optional[Path] = None
@@ -307,6 +338,16 @@ def _render_latex_figure(inner: str, ctx: RenderContext) -> None:
         ctx.builder.image(path, caption=caption or None, alt_text=caption)
     else:
         ctx.builder.image_placeholder(caption=caption or "[figure]", description="")
+
+
+def _caption_prefix(latex: str, ctx: RenderContext) -> str:
+    """"Figure 2: " for a fence whose figure label is in the label map, so
+    the Word caption carries the number LaTeX prints and \\ref points to."""
+    for key in _LABEL_RE.findall(latex):
+        kind, num = (ctx.labels or {}).get(key, ("", 0))
+        if kind == "Figure":
+            return f"{kind} {num}: "
+    return ""
 
 
 def _extract_latex_caption(inner: str) -> Optional[str]:
@@ -359,7 +400,14 @@ def _inline_to_rich(text: str, ctx: RenderContext) -> list[RichText]:
         return "[" + ", ".join(nums) + "]"
 
     text = _CITE_RE.sub(_cite, text)
-    text = _REF_RE.sub(lambda m: m.group(1), text)
+
+    def _ref(m: re.Match) -> str:
+        # Just the number, as LaTeX's \ref prints it; the prose supplies the
+        # noun ("Figure \ref{fig:x}"). Unknown labels fall back to the key.
+        found = (ctx.labels or {}).get(m.group(1))
+        return str(found[1]) if found else m.group(1)
+
+    text = _REF_RE.sub(_ref, text)
     text = _LABEL_RE.sub("", text)
 
     # Strip LaTeX escape sequences that don't belong in plain prose.
