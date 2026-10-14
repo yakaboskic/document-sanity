@@ -131,6 +131,10 @@ metadata:
     $p = {{PVAL:.2e}}$ are substituted at build time.
   keywords: [genetics, drug-targets, bayesian]
   template: nature              # or article; loads templates/<name>.tex
+  # Optional: set apart above the first section in every output (centered,
+  # italic, small type). For legends, CUI banners, distribution statements.
+  notice: |
+    This document contains proprietary data; see the restriction notice.
 
 sections:
   - docs/introduction.md

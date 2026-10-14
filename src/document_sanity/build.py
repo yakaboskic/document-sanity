@@ -127,6 +127,17 @@ class ManuscriptBuilder:
 
         return '\n'.join(lines)
 
+    def _build_notice_block(self) -> str:
+        """LaTeX for manifest.metadata.notice: centered, small and italic,
+        ahead of the first section. Markdown, converted like a section."""
+        notice = self.manifest.metadata.notice
+        if not notice:
+            return ''
+        from .md2latex import md_to_latex
+        _, body = md_to_latex(notice.strip(), escape_text=False)
+        body = self.processor.replace_variables(body.strip(), 'manifest.yaml:notice')
+        return '\\begin{center}\n\\small\\itshape\n' + body + '\n\\end{center}'
+
     def _build_abstract_block(self, template_text: str = "") -> str:
         """Generate LaTeX abstract block.
 
@@ -284,6 +295,9 @@ class ManuscriptBuilder:
 
         # Build content block, handling pseudo-sections
         content_lines = []
+        notice_block = self._build_notice_block()
+        if notice_block:
+            content_lines += [notice_block, '']
         bib_placed = False
         for sec_path in section_paths:
             if sec_path == '_bibliography':

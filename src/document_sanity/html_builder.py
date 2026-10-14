@@ -694,6 +694,7 @@ INDEX_TEMPLATE = """<!doctype html>
   .author { margin: 0 .5rem; }
   .affiliations { font-size: .85rem; color: hsl(var(--muted-foreground)); padding-left: 1.5rem; margin-top: .5rem; }
   .abstract { background: hsl(var(--muted)); padding: 1.25rem; border-radius: .5rem; margin: 1.5rem 0; }
+  .notice { text-align: center; font-style: italic; font-size: .875em; margin: 1.5rem 0; }
   hr { border: 0; border-top: 1px solid hsl(var(--border)); margin: 2rem 0; }
   iframe { background: white; }
 </style>
@@ -719,6 +720,7 @@ INDEX_TEMPLATE = """<!doctype html>
       {abstract_html}
 
       <main>
+        {notice_html}
         {sections_html}
       </main>
     </div>
@@ -1167,6 +1169,11 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
                               resolve_citation=citations.resolve)
         abstract_html = f'<aside class="abstract"><h2>Abstract</h2>{abs_body}</aside>'
 
+    # Notice (restrictive legend, CUI banner, ...) set apart ahead of the first section
+    notice_html = ''
+    if manifest.metadata.notice:
+        notice_html = f'<div class="notice">{md_to_html(manifest.metadata.notice, resolve)}</div>'
+
     # Bibliography section — appended after all cited sections so numbering
     # reflects first-appearance order (matches natbib unsrt convention).
     references_html = citations.render_bibliography_html()
@@ -1183,6 +1190,7 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
                           .replace("{authors_html}", _render_authors_html(manifest)) \
                           .replace("{affiliations_html}", _render_affiliations_html(manifest)) \
                           .replace("{abstract_html}", abstract_html) \
+                          .replace("{notice_html}", notice_html) \
                           .replace("{sections_html}", sections_joined) \
                           .replace("{toc_html}", toc_html) \
                           .replace("{katex_macros_json}", json.dumps(katex_macros)) \
