@@ -233,6 +233,21 @@ def render_markdown(
         i += 1
 
 
+def render_notice(text: str, builder: ContentBuilder) -> None:
+    """Render manifest.metadata.notice: each paragraph centered, italic and
+    in the small font size, set apart at the top of the body."""
+    ctx = RenderContext(builder=builder)
+    s = builder.styles
+    style = TextStyle(
+        alignment="center",
+        italic=True,
+        size=s["fontSizes"]["small"],
+        spacing_after=s["spacing"]["paragraph"]["afterSmall"],
+    )
+    for para in re.split(r"\n\s*\n", text.strip()):
+        builder.p(_inline_to_rich(" ".join(para.split()), ctx), style)
+
+
 # ---- block helpers --------------------------------------------------------
 
 def _render_code_block(code: str, lang: str, ctx: RenderContext) -> None:

@@ -38,7 +38,7 @@ from .docx_template import TemplateDocument, TemplateDocumentConfig
 from .docx_xml import RichText
 from .labels import collect_labels
 from .manifest import Manifest, resolve_figure
-from .md2docx import render_markdown
+from .md2docx import render_markdown, render_notice
 from .variable_processor import VariableProcessor
 
 
@@ -205,6 +205,13 @@ class WordBuilder:
             c.labeled_para("Keywords: ", kw)
         c.spacer()
 
+    def _add_notice(self, doc: TemplateDocument) -> None:
+        notice = self.manifest.metadata.notice
+        if not notice:
+            return
+        text = self.processor.replace_variables(notice.strip(), "manifest.yaml:notice")
+        render_notice(text, doc.content)
+
     def _render_sections(self, doc: TemplateDocument) -> None:
         pseudo = {"_bibliography", "_toc"}
         bib_placed = False
@@ -317,6 +324,8 @@ class WordBuilder:
             self._add_abstract(doc)
         else:
             print("  Skipping title/abstract block (manifest.metadata.render: false)")
+
+        self._add_notice(doc)
 
         print("\n  Rendering sections...")
         self._render_sections(doc)

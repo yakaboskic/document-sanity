@@ -332,6 +332,11 @@ class Metadata:
     # populated and available for variable substitution.
     render: bool = True
     document_class: Optional[str] = None
+    # A short notice set apart at the top of the body, ahead of the first
+    # section, in every output: centered, italic, small type. For restrictive
+    # legends, CUI banners, distribution statements. Markdown; rendered
+    # whether or not `render` is set.
+    notice: Optional[str] = None
 
 
 class Manifest:
@@ -399,6 +404,7 @@ class Manifest:
             html_styles=raw.get('html_styles'),
             render=raw.get('render', True),
             document_class=raw.get('document_class'),
+            notice=raw.get('notice'),
         )
 
     def _resolve_abstract(self, value: Any) -> tuple[Optional[str], Optional[str]]:
@@ -523,6 +529,8 @@ class Manifest:
             meta['word_template'] = self.metadata.word_template
         if self.metadata.document_class:
             meta['document_class'] = self.metadata.document_class
+        if self.metadata.notice:
+            meta['notice'] = self.metadata.notice
         if meta:
             data['metadata'] = meta
 
