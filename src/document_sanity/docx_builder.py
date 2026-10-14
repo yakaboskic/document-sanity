@@ -36,6 +36,7 @@ from .docx_extract import extract_styles
 from .docx_styles import default_styles, load_styles
 from .docx_template import TemplateDocument, TemplateDocumentConfig
 from .docx_xml import RichText
+from .labels import collect_labels
 from .manifest import Manifest, resolve_figure
 from .md2docx import render_markdown
 from .variable_processor import VariableProcessor
@@ -207,6 +208,8 @@ class WordBuilder:
     def _render_sections(self, doc: TemplateDocument) -> None:
         pseudo = {"_bibliography", "_toc"}
         bib_placed = False
+        # Numbered across all sections up front, so a \ref before its figure resolves.
+        labels = collect_labels(self.manifest, self.src_dir)
 
         for section_ref in self.manifest.sections:
             if section_ref == "_bibliography":
@@ -243,6 +246,7 @@ class WordBuilder:
                 figure_resolver=self._resolve_figure,
                 figures_dir=self.figures_dir,
                 section_path=section_ref,
+                labels=labels,
             )
 
         if not bib_placed:
