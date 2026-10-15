@@ -28,11 +28,12 @@ VariableProcessor before we get here — we don't re-substitute.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
 from .docx_content import ContentBuilder, TextStyle
+from .docx_math import DISPLAY_RE, INLINE_RE, MathCache, scan
 from .docx_xml import RichText
 
 
@@ -75,6 +76,10 @@ class RenderContext:
     figures_dir: Optional[Path] = None
     section_path: str = ""
     labels: Optional[Labels] = None
+    math: Optional[MathCache] = None
+    # Figure captions taken from the LaTeX fence (bold, italics, math and citations
+    # kept), keyed by the sentinel that replaces the preview image's alt text.
+    captions: list[str] = field(default_factory=list)
 
 
 # ---- entry point -----------------------------------------------------------
@@ -95,6 +100,7 @@ def render_markdown(
         figures_dir=figures_dir,
         section_path=section_path,
         labels=labels,
+        math=MathCache(),
     )
 
     # 0. A fence with a preview block renders from the preview alone (its
@@ -102,7 +108,14 @@ def render_markdown(
     def _prefer_preview(m: re.Match) -> str:
         prefix = _caption_prefix(m.group(1), ctx)
         preview = m.group(2)
-        if prefix:
+        rich = _latex_caption_markdown(m.group(1))
+        if rich is not None:
+            # The preview's alt text has lost the caption's formatting; carry the
+            # LaTeX caption (as markdown) to the image through a sentinel.
+            ctx.captions.append(prefix + rich)
+            key = f"\x03CAP{len(ctx.captions) - 1}\x03"
+            preview = _IMAGE_MD_RE.sub(lambda im: f"![{key}]({im.group(2)})", preview, count=1)
+        elif prefix:
             preview = _IMAGE_MD_RE.sub(
                 lambda im: f"![{prefix}{im.group(1)}]({im.group(2)})", preview, count=1
             )
@@ -130,6 +143,15 @@ def render_markdown(
     # 4. Strip LaTeX-only floats
     text = re.sub(r"\\FloatBarrier\b", "", text)
 
+    # 4b. Convert every math snippet of the section in one batch (pandoc):
+    #     $$...$$ and $...$ in the markdown, and math environments in fences.
+    snippets = scan(text)
+    for block in latex_blocks:
+        env = _MATH_ENV_RE.search(block)
+        if env:
+            snippets.append((env.group(2), True))
+    ctx.math.prefetch(snippets)
+
     # 5. Block-level walk.
     lines = text.split("\n")
     i = 0
@@ -149,6 +171,18 @@ def render_markdown(
             block = latex_blocks[int(sentinel_m.group(1))]
             _render_latex_block(block, ctx)
             i += 1
+            continue
+
+        # Display math: $$ ... $$ on one line or across several.
+        if stripped.startswith("$$"):
+            chunk = [line]
+            while not DISPLAY_RE.search("\n".join(chunk)) and i + 1 < n:
+                i += 1
+                chunk.append(lines[i])
+            i += 1
+            joined = "\n".join(chunk)
+            for m in DISPLAY_RE.finditer(joined):
+                _render_display_math(m.group(1), ctx)
             continue
 
         # Fenced code (non-latex).
@@ -303,6 +337,8 @@ def _render_latex_block(body: str, ctx: RenderContext) -> None:
         return
 
     if env in {"equation", "align", "gather", "multline", "eqnarray"}:
+        if ctx.math is not None and _render_display_math(env_match.group(0), ctx):
+            return
         style = TextStyle(
             font=ctx.builder.styles["fonts"]["mono"],
             size=ctx.builder.styles["fontSizes"]["small"],
@@ -320,6 +356,32 @@ def _render_latex_block(body: str, ctx: RenderContext) -> None:
         caption = _extract_latex_caption(inner) or "[LaTeX table]"
         ctx.builder.image_placeholder(caption=caption, description="")
         return
+
+
+_MATH_ENV_RE = re.compile(
+    r"\\begin\{(equation\*?|align\*?|gather\*?|multline\*?|eqnarray\*?)\}([\s\S]*?)\\end\{\1\}"
+)
+
+
+def _render_display_math(tex: str, ctx: RenderContext) -> bool:
+    """A display equation as Office Math; the LaTeX source as centred italic
+    text when it cannot be converted. Returns whether Office Math was written."""
+    m = _MATH_ENV_RE.search(tex)
+    if m:  # a whole environment: convert its body (aligned when it is an align)
+        body = m.group(2)
+        tex = f"\\begin{{aligned}}{body}\\end{{aligned}}" if m.group(1).startswith(("align", "eqnarray")) else body
+    omml = ctx.math.get(tex.strip(), True) if ctx.math is not None else None
+    if omml:
+        ctx.builder.raw(f'<w:p><w:pPr><w:spacing w:before="120" w:after="120"/></w:pPr>{omml}</w:p>')
+        return True
+    style = TextStyle(
+        font=ctx.builder.styles["fonts"]["mono"],
+        size=ctx.builder.styles["fontSizes"]["small"],
+        alignment="center",
+        italic=True,
+    )
+    ctx.builder.p(tex.strip(), style)
+    return False
 
 
 def _render_latex_figure(inner: str, ctx: RenderContext) -> None:
@@ -365,6 +427,27 @@ def _caption_prefix(latex: str, ctx: RenderContext) -> str:
     return ""
 
 
+def _latex_caption_markdown(block: str) -> Optional[str]:
+    """The \\caption{...} of a LaTeX figure as inline markdown: \\textbf and \\textit
+    become ** and *, while citations, references, math and escapes stay for the
+    inline renderer. None when the block has no caption."""
+    m = re.search(r"\\caption\s*\{", block)
+    if not m:
+        return None
+    depth, i = 1, m.end()
+    while i < len(block) and depth:
+        depth += {"{": 1, "}": -1}.get(block[i], 0) if block[i - 1] != "\\" else 0
+        i += 1
+    if depth:
+        return None
+    body = block[m.end() : i - 1]
+    for _ in range(3):  # nested formatting, innermost first
+        body = re.sub(r"\\textbf\{([^{}]*)\}", r"**\1**", body)
+        body = re.sub(r"\\(?:textit|emph)\{([^{}]*)\}", r"*\1*", body)
+    body = re.sub(r"\\label\{[^{}]*\}", "", body)
+    return re.sub(r"\s+", " ", body).strip()
+
+
 def _extract_latex_caption(inner: str) -> Optional[str]:
     # Find \caption{...} allowing one level of nested braces.
     m = re.search(r"\\caption\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", inner)
@@ -396,14 +479,32 @@ def _inline_to_rich(text: str, ctx: RenderContext) -> list[RichText]:
     # paragraph in Word, so we emit the drawing now and drop the token.
     def _image_pull(m: re.Match) -> str:
         alt, src = m.group(1), m.group(2)
+        cap = re.fullmatch(r"\x03CAP(\d+)\x03", alt)
+        caption: object = alt or None
+        if cap:  # the LaTeX caption, rendered with its formatting, math and citations
+            md = ctx.captions[int(cap.group(1))]
+            caption = _inline_to_rich(md, ctx)
+            alt = _rich_to_text(caption)
         p = _resolve_relative_image(src, ctx)
         if p and _image_supported(p):
-            ctx.builder.image(p, caption=alt or None, alt_text=alt or "")
+            ctx.builder.image(p, caption=caption, alt_text=alt or "")
             return ""
         # Fallback: show alt text in brackets so nothing is silently lost.
         return f"[{alt}]"
 
     text = _IMAGE_MD_RE.sub(_image_pull, text)
+
+    # Inline math -> sentinels, expanded to Office Math runs after tokenizing
+    # (before the escape stripping below, which would unescape \$ into $).
+    math_runs: list[RichText] = []
+
+    def _math(m: re.Match) -> str:
+        tex = m.group(1)
+        omml = ctx.math.get(tex, False) if ctx.math is not None else None
+        math_runs.append(RichText(text="" if omml else tex, italic=None if omml else True, omml=omml))
+        return f"\x02{len(math_runs) - 1}\x02"
+
+    text = INLINE_RE.sub(_math, text)
 
     # Links — keep the display text, drop the URL.
     text = _LINK_MD_RE.sub(lambda m: m.group(1), text)
@@ -433,7 +534,26 @@ def _inline_to_rich(text: str, ctx: RenderContext) -> list[RichText]:
         text = text.replace(esc, lit)
 
     # Now tokenize for bold/italic/code.
-    return _tokenize_inline(text)
+    return _expand_math(_tokenize_inline(text), math_runs)
+
+
+def _expand_math(runs: list[RichText], math_runs: list[RichText]) -> list[RichText]:
+    """Split runs at inline-math sentinels and put the math runs in their place."""
+    if not math_runs:
+        return runs
+    out: list[RichText] = []
+    for run in runs:
+        if "\x02" not in run.text:
+            out.append(run)
+            continue
+        for k, piece in enumerate(run.text.split("\x02")):
+            if k % 2:
+                out.append(math_runs[int(piece)])
+            elif piece:
+                out.append(RichText(text=piece, bold=run.bold, italic=run.italic, color=run.color,
+                                    font=run.font, size=run.size, rstyle=run.rstyle,
+                                    vert_align=run.vert_align))
+    return out
 
 
 def _resolve_relative_image(src: str, ctx: RenderContext) -> Optional[Path]:
@@ -612,6 +732,8 @@ def _is_block_start(line: str) -> bool:
     if stripped.startswith("#"):
         return True
     if stripped.startswith("```"):
+        return True
+    if stripped.startswith("$$"):
         return True
     if re.match(r"^---+$", stripped) or re.match(r"^\*\*\*+$", stripped):
         return True
