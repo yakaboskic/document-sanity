@@ -191,6 +191,14 @@ def _build_resolve_variable(processor: VariableProcessor, manifest: Manifest):
     return resolve
 
 
+def _render_header_html(manifest: Manifest, title: str) -> str:
+    return ('<header class="paper-header">\n'
+            f'        <div id="top" class="paper-title">{title}</div>\n'
+            f'        {_render_authors_html(manifest)}\n'
+            f'        {_render_affiliations_html(manifest)}\n'
+            '      </header>')
+
+
 def _render_authors_html(manifest: Manifest) -> str:
     meta = manifest.metadata
     if not meta.authors:
@@ -711,11 +719,7 @@ INDEX_TEMPLATE = """<!doctype html>
     </div>
     <div class="gear-btn" onclick="toggleVariationPanel()" title="Settings">&#9881;</div>
     <div class="content">
-      <header class="paper-header">
-        <div id="top" class="paper-title">{title}</div>
-        {authors_html}
-        {affiliations_html}
-      </header>
+      {header_html}
 
       {abstract_html}
 
@@ -1162,9 +1166,13 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
         if verbose:
             print(f'    Rendered: {section_ref}')
 
-    # Abstract (if present), rendered as an inline markdown snippet
+    # Abstract (if present), rendered as an inline markdown snippet.
+    # metadata.render: false means the document owns its front matter, so
+    # the title/authors/abstract block is left out (as in LaTeX and Word).
     abstract_html = ''
-    if manifest.metadata.abstract:
+    if not manifest.metadata.render:
+        print('  Skipping title/abstract block (manifest.metadata.render: false)')
+    elif manifest.metadata.abstract:
         abs_body = md_to_html(manifest.metadata.abstract, resolve,
                               resolve_citation=citations.resolve)
         abstract_html = f'<aside class="abstract"><h2>Abstract</h2>{abs_body}</aside>'
@@ -1180,15 +1188,17 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
     if references_html:
         section_htmls.append(references_html)
 
+    # The page <title> keeps metadata.title either way; only the visible
+    # header goes when the document renders its own front matter.
     title = manifest.metadata.title or 'Manuscript'
+    header_html = _render_header_html(manifest, title) if manifest.metadata.render else ''
 
     sections_joined = '\n'.join(section_htmls)
     toc = _extract_toc(sections_joined)
     toc_html = _render_toc_html(toc)
 
     html = INDEX_TEMPLATE.replace("{title}", title) \
-                          .replace("{authors_html}", _render_authors_html(manifest)) \
-                          .replace("{affiliations_html}", _render_affiliations_html(manifest)) \
+                          .replace("{header_html}", header_html) \
                           .replace("{abstract_html}", abstract_html) \
                           .replace("{notice_html}", notice_html) \
                           .replace("{sections_html}", sections_joined) \
