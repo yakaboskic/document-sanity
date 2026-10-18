@@ -1,66 +1,25 @@
+<a href="https://sanitism.dev"><img src="https://sanitism.dev/media/one-number-poster.jpg" alt="One number in manifest.yaml and a sentence in docs/results.md build into LaTeX, PDF, Word, HTML, slides and a blog post, each showing 12,453." width="100%"></a>
+
 # document-sanity
 
-Build PDF (LaTeX), interactive HTML, Word (`.docx`), and preview-friendly
-markdown — all from a single Markdown source of truth. `manifest.yaml` is the
-one source of configuration per version; variables carry provenance;
-figures/equations/tables render across every target, including inline
-GitHub/VSCode/Obsidian previews. Sibling project to
-[`presentation-sanity`](https://github.com/yakaboskic/presentation-sanity);
-both are part of [Sanitism](https://sanitism.dev): built for autists to
-communicate their work, sanely.
+**Write a paper, proposal or report once in Markdown. Get LaTeX, a PDF, a Word file and an interactive HTML page, with every number traced to the script that made it.**
+
+Part of [Sanitism](https://sanitism.dev): built for autists to communicate their work, sanely. The sibling for talks is [presentation-sanity](https://github.com/yakaboskic/presentation-sanity).
+
+**See it:** [the starter paper](https://document.sanitism.dev/manuscript/), [its PDF](https://document.sanitism.dev/manuscript/manuscript.pdf), [its Word file](https://document.sanitism.dev/manuscript/manuscript.docx) and [a proposal](https://document.sanitism.dev/proposal/), all built from [document-sanity-template](https://github.com/yakaboskic/document-sanity-template).
+
+## Start a project
+
+<img src="https://sanitism.dev/figures/two-ways-in.svg" alt="A template repo leads two ways. Use this template on GitHub gives the project a repo with history. Running uvx init gives a plain folder with no git. Both arrive at the same project." width="100%">
+
+**Just give me a folder.** No clone, no git. It needs [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1" \
   document-sanity init my-paper --title "My paper"
 ```
 
-That's a named project from
-[document-sanity-template](https://github.com/yakaboskic/document-sanity-template)
-(a manuscript and a proposal starter, live at
-<https://yakaboskic.github.io/document-sanity-template/>), with an
-[agent skill](#agent-skill) installed. No clone, no git required. See
-[Start a project](#start-a-project).
-
-## What it does
-
-| Command | Output | When to use |
-|---|---|---|
-| `document-sanity build --compile` | `out/<ver>/pdf/main.pdf` | Build the paper PDF. |
-| `document-sanity html --open` | `out/<ver>/html/index.html` | Interactive viewer: TOC sidebar, KaTeX math, clickable variables with a provenance panel, hyperlinked bibliography. |
-| `document-sanity word` | `out/<ver>/word/main.docx` | Build a Word document from a `.docx` template in `templates/` — styles are extracted from the template, figures are embedded, citations render as a numbered References list, and tables, headings and figures are kept together across page breaks (`--no-layout` skips that). |
-| `document-sanity word --extract-styles` | `out/<ver>/word/styles.json` | Dump the template's extracted styles so you can hand-tune before the next build. |
-| `document-sanity preview` | Inline preview blocks in each `.md` | Make ```latex figure/equation/table blocks render as `![alt](path)` / `$$...$$` / `\|cell\|` so GitHub shows something meaningful. Idempotent; hash-tagged. |
-| `document-sanity preview --check` | Exit 1 if stale | CI-friendly. |
-| `document-sanity import` | New `src/<ver>/` tree | Convert an existing `\input{}`-style LaTeX project into the markdown-as-source-of-truth layout. |
-| `document-sanity new-version` | Copied `src/<ver>/` | Snapshot today's version from the previous one. |
-| `document-sanity init [DIR]` | A project from the template | Start a new project: manuscript and/or proposal starters, the agent skill. See [Start a project](#start-a-project). |
-| `document-sanity check [DOC…]` | Exit 1 on anything to fix | Every target (PDF, HTML, Word) of every document, plus `preview --check` and unresolved variables / citations / `\ref`s. One command before sharing. See [Check](#check-before-you-share). |
-| `document-sanity site [DOC…]` | `site/` | Every document's HTML viewer, PDF and Word, with an index page. What the Pages workflow publishes. |
-| `document-sanity pages init` | `.github/workflows/pages.yml` | Publish on GitHub Pages (public! it asks first). See [Publish on GitHub Pages](#publish-on-github-pages). |
-| `document-sanity skills` | `.claude/skills/`, `.agents/skills/` | Install or refresh the [agent skill](#agent-skill). |
-| `document-sanity convert file.md/.tex` | The other format | One-off md↔tex conversion (useful for scripting). |
-| `document-sanity drawio sync <fig-id>` | Refreshed `figures/<id>/<id>.png` | Re-import regenerated source assets into a draw.io-composed figure (crop/position recorded in the .drawio XML) and re-export the PNG. See [docs/drawio-figures.md](docs/drawio-figures.md). |
-| `document-sanity drawio status <fig-id>` | Exit 1 if stale | CI-friendly staleness check for composed figures. |
-
-## Documentation
-
-Opinionated conventions are documented in detail under [`docs/`](./docs):
-
-- [Figures](./docs/figures.md) — subdirectory layout, target-specific artifact resolution, whitespace cropping.
-- [References & labels](./docs/references-and-labels.md) — `fig:` / `tab:` / `eq:` prefix convention drives auto-numbering.
-- [Preview blocks](./docs/preview-blocks.md) — hash-tagged markdown approximations of ```latex blocks for GitHub/VSCode.
-- [Variables & provenance](./docs/variables-and-provenance.md) — `{{VAR:fmt}}` syntax + provenance metadata that powers the HTML viewer's side panel.
-- [HTML viewer](./docs/html-viewer.md) — layout, TOC, KaTeX, figure modal, scroll-spy.
-- [HTML multi-plot standard](./docs/html-multi-plot-standard.md) — Plotly normalization and tabbed layouts.
-- [Bibliography](./docs/bibliography.md) — `.bib` parsing, citation numbering, entry rendering.
-
-## Start a project
-
-One command, no clone and no git:
-
 ```bash
-uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1" \
-  document-sanity init my-paper --title "My paper" --starter manuscript
 cd my-paper
 uv sync                                  # the pinned document-sanity; writes uv.lock (commit it)
 make html VERSION=manuscript             # → out/manuscript/html/index.html
@@ -68,110 +27,161 @@ make pdf VERSION=manuscript              # → out/manuscript/pdf/main.pdf (need
 uv run document-sanity check             # every target, before you share
 ```
 
-`init` copies the snapshot of
-[`document-sanity-template`](https://github.com/yakaboskic/document-sanity-template)
-that ships inside this release, so a project made by vX.Y.Z is the template
-vX.Y.Z was released with, and its dependency line is pinned back to vX.Y.Z.
+**Keep it in git.** On [document-sanity-template](https://github.com/yakaboskic/document-sanity-template), click **Use this template**, clone your copy and run `python init.py`. It is a thin shim over the same `init`, so both ways give you the same project: the starters you asked for, pinned to this release, with the [agent skill](#agent-skill) installed.
 
-- **Answers** are prompted for, or given as flags: `--name` (default: the
-  folder's name), `--title`, `--author` and `--email` (default: your git
-  config), `--description`, and `--starter` (`manuscript`, `proposal`, or
-  `both`, the default). `--yes` takes the defaults for anything unset. The
-  name goes into `pyproject.toml` and `README.md`; the title and author into
-  each kept starter's `manifest.yaml` (the lines the template marks
-  `TEMPLATE:`); the starters you don't keep are left out.
-- **The folder** can be new, empty, or an existing one to knit into (`init
-  .`). Everything is assembled in memory first. If any file would be
-  replaced, `init` lists them and writes nothing; `--force` overwrites them.
-  A folder that already has documents under `src/` is refused outright
-  (`skills` refreshes the skill; `new-version` adds a document).
+<details>
+<summary><b>What <code>init</code> does, flag by flag</b></summary>
+
+`init` copies the snapshot of [`document-sanity-template`](https://github.com/yakaboskic/document-sanity-template) that ships inside this release, so a project made by vX.Y.Z is the template vX.Y.Z was released with, and its dependency line is pinned back to vX.Y.Z.
+
+- **Answers** are prompted for, or given as flags: `--name` (default: the folder's name), `--title`, `--author` and `--email` (default: your git config), `--description`, and `--starter` (`manuscript`, `proposal`, or `both`, the default). `--yes` takes the defaults for anything unset. The name goes into `pyproject.toml` and `README.md`; the title and author into each kept starter's `manifest.yaml` (the lines the template marks `TEMPLATE:`); the starters you don't keep are left out.
+- **The folder** can be new, empty, or an existing one to knit into (`init .`). Everything is assembled in memory first. If any file would be replaced, `init` lists them and writes nothing; `--force` overwrites them. A folder that already has documents under `src/` is refused outright (`skills` refreshes the skill; `new-version` adds a document).
 - **`--git`** adds `git init` and a first commit. Without it there's no `.git`.
-- **`uv.lock`** is left out, `--in-place` included: the template's lock is
-  one release behind the snapshot's pin, and renaming the project renames its
-  root package. The project's first `uv sync` writes a lock for the pinned
-  tag. Commit it; the Pages workflow installs with `--locked`.
-- **`--from gh:owner/repo[@ref]`** starts from a GitHub tarball instead, e.g.
-  your lab's fork of the template. No git binary needed; `GH_TOKEN` (or
-  `GITHUB_TOKEN`) reaches a private fork. A fork's own pin is left alone.
-- **The agent skill** goes into `.claude/skills/document-sanity/` and
-  `.agents/skills/document-sanity/` unless `--no-skills` ([below](#agent-skill)).
+- **`uv.lock`** is left out, `--in-place` included: the template's lock is one release behind the snapshot's pin, and renaming the project renames its root package. The project's first `uv sync` writes a lock for the pinned tag. Commit it; the Pages workflow installs with `--locked`.
+- **`--from gh:owner/repo[@ref]`** starts from a GitHub tarball instead, e.g. your lab's fork of the template. No git binary needed; `GH_TOKEN` (or `GITHUB_TOKEN`) reaches a private fork. A fork's own pin is left alone.
+- **The agent skill** goes into `.claude/skills/document-sanity/` and `.agents/skills/document-sanity/` unless `--no-skills`.
 
-On GitHub, **"Use this template"** on document-sanity-template works too:
-its `init.py` is a thin shim that runs `document-sanity init --in-place`
-with the pinned version, so both ways share one code path.
+</details>
 
-## Use it in your paper project
+## What goes in, what comes out
 
-Each paper is its own repo that declares `document-sanity` as a dependency.
-This keeps paper content out of the tool's history and lets multiple papers
-track different versions independently. `init` writes this for you:
+<img src="https://sanitism.dev/figures/document-pipeline.svg" alt="What you write: manifest.yaml, docs/*.md, figures, tables and refs.bib, and templates. One document-sanity check builds every target. What your readers get: LaTeX, PDF, Word, and interactive HTML where 12,453 traces back to data/qc.csv and scripts/qc.py." width="100%">
 
-**`pyproject.toml`** (paper repo):
+You write plain text that diffs well. One `manifest.yaml` per document holds the title, authors, section order and every number with its source. The same Markdown sections then print four ways:
 
-```toml
-[project]
-name = "my-paper"
-version = "0.1.0"
-requires-python = ">=3.10"
-# Pin a release tag (https://github.com/yakaboskic/document-sanity/releases),
-# not @main; to upgrade, change the tag and run `uv lock`.
-dependencies = [
-    "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1",
-]
+- **LaTeX.** A clean, compilation-ready `out/<doc>/latex/main.tex` from your own `templates/<name>.tex`, for the journal or Overleaf.
+- **PDF.** That LaTeX compiled with your class and bib style.
+- **Word.** A `.docx` built on your own Word template: its headers, footers, theme and styles are kept, and tables, headings and figures stay together across page breaks.
+- **Interactive HTML.** A single page with a contents sidebar, KaTeX math, a linked bibliography, and numbers that open their provenance when clicked.
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+| Command | Output | When |
+|---|---|---|
+| `document-sanity check [DOC…]` | every target, plus broken references | Before you share. Exits non-zero on anything to fix. |
+| `document-sanity build --compile` | `out/<doc>/latex/`, `out/<doc>/pdf/main.pdf` | The LaTeX tree and the PDF. |
+| `document-sanity word` | `out/<doc>/word/main.docx` | The Word file. |
+| `document-sanity html --open` | `out/<doc>/html/index.html` | The interactive viewer. |
+| `document-sanity preview` | preview blocks in each `.md` | Makes ```` ```latex ```` blocks readable on GitHub. |
+| `document-sanity new-version` | a copied `src/<doc>/` | A new version is a new folder. |
+| `document-sanity site` / `pages init` | `site/`, a Pages workflow | Publish every document ([below](#publish-on-github-pages)). |
 
-[tool.hatch.metadata]
-allow-direct-references = true  # required for the git+ dependency
+<details>
+<summary><b>Every command</b></summary>
 
-[tool.hatch.build.targets.wheel]
-bypass-selection = true          # this repo has no importable Python
+| Command | Output | When to use |
+|---|---|---|
+| `document-sanity init [DIR]` | A project from the template | Start a new project ([above](#start-a-project)). |
+| `document-sanity build --compile` | `out/<doc>/pdf/main.pdf` | Build the LaTeX tree and compile the PDF. |
+| `document-sanity html --open` | `out/<doc>/html/index.html` | Interactive viewer: TOC sidebar, KaTeX math, clickable variables with a provenance panel, hyperlinked bibliography. |
+| `document-sanity word` | `out/<doc>/word/main.docx` | Word document from a `.docx` template in `templates/`. Styles are extracted from the template, figures are embedded, citations render as a numbered References list, and tables, headings and figures are kept together across page breaks (`--no-layout` skips that). |
+| `document-sanity word --extract-styles` | `out/<doc>/word/styles.json` | Dump the template's extracted styles to hand-tune before the next build. |
+| `document-sanity preview` | Inline preview blocks in each `.md` | Make ```` ```latex ```` figure/equation/table blocks render as `![alt](path)` / `$$...$$` / `\|cell\|` so GitHub shows something meaningful. Idempotent; hash-tagged. |
+| `document-sanity preview --check` | Exit 1 if stale | CI-friendly. |
+| `document-sanity check [DOC…]` | Exit 1 on anything to fix | Every target (PDF, HTML, Word) of every document, plus `preview --check` and unresolved variables / citations / `\ref`s ([below](#check-before-you-share)). |
+| `document-sanity site [DOC…]` | `site/` | Every document's HTML viewer, PDF and Word, with an index page. What the Pages workflow publishes. |
+| `document-sanity pages init` | `.github/workflows/pages.yml` | Publish on GitHub Pages (public! it asks first). |
+| `document-sanity new-version` | Copied `src/<doc>/` | Snapshot a document into a new version folder. |
+| `document-sanity import` | New `src/<doc>/` tree | Convert an existing `\input{}`-style LaTeX project into Markdown sources. |
+| `document-sanity skills` | `.claude/skills/`, `.agents/skills/` | Install or refresh the [agent skill](#agent-skill). |
+| `document-sanity convert file.md/.tex` | The other format | One-off md↔tex conversion (useful for scripting). |
+| `document-sanity drawio sync <fig-id>` | Refreshed `figures/<id>/<id>.png` | Re-import regenerated source assets into a draw.io-composed figure and re-export the PNG ([docs](docs/drawio-figures.md)). |
+| `document-sanity drawio status <fig-id>` | Exit 1 if stale | CI-friendly staleness check for composed figures. |
+
+</details>
+
+## A project, folder by folder
+
+This is what `init` writes. Every document is a folder under `src/`, and versions are folders too.
+
+```
+my-paper/
+├── pyproject.toml          # pins document-sanity to a release
+├── Makefile                # install, latex, pdf, html, word, check, site, …
+├── AGENTS.md               # points coding agents at the skill
+├── templates/
+│   ├── article.tex         # LaTeX template (the manuscript's look)
+│   ├── proposal.tex        # the proposal's: same packages, unnumbered sections
+│   └── article.docx        # Word template: header logo, page-of-N, watermark, styles
+├── styles/
+│   ├── article.yaml        # Word styles, round-tripped from the template
+│   └── article.css         # extra HTML styles
+├── src/
+│   ├── manuscript/         # a paper: title block, abstract, IMRaD sections
+│   │   ├── manifest.yaml   # the one source of configuration
+│   │   ├── docs/*.md       # sections, in manifest order
+│   │   ├── figures/<id>/   # one folder per figure, any formats
+│   │   ├── tables/         # CSV, TSV, Markdown or LaTeX tables
+│   │   └── references.bib
+│   └── proposal/           # a proposal: hand-numbered sections, its own cover
+└── out/                    # generated, gitignored
+    └── manuscript/{latex,pdf,html,word}/
 ```
 
-Then:
+## The manifest
 
-```bash
-uv sync                           # install document-sanity from GitHub
-uv run document-sanity build --compile
-uv run document-sanity html --open
+One file per document. This is the starter manuscript's, shortened:
+
+```yaml
+metadata:
+  title: "A Starter Manuscript Built with document-sanity"
+  authors:
+    - { name: "First Author", email: "first.author@example.edu", affiliations: [1] }
+  affiliations:
+    1: { department: "Department of Research", institution: "Example University" }
+  abstract: |
+    We analyzed {{NUM_SAMPLES:,}} samples and found a significant effect
+    ($p = {{PVAL:.2e}}$, R<sup>2</sup> = {{R2:.2f}}).
+  template: article            # templates/article.tex   (LaTeX, PDF)
+  word_template: article       # templates/article.docx  (Word)
+  # notice: |                  # optional banner above the first section, in every
+  #   Distribution limited.    #   output (CUI, distribution statements)
+
+sections:
+  - docs/introduction.md
+  - docs/methods.md
+  - docs/results.md
+  - docs/discussion.md
+  - _bibliography              # inserts the reference list here
+
+variables:
+  NUM_SAMPLES: 1247            # the simple form
+  PVAL:                        # the full form: the HTML viewer shows where it came from
+    value: 0.0087
+    provenance:
+      description: P-value of the primary test, after Benjamini–Hochberg adjustment.
+      source: data/analysis_results.parquet
+      data: [data/raw_measurements.csv, data/phenotype_metadata.tsv]
+      command: python scripts/primary_test.py --out data/analysis_results.parquet
+      updated: "2026-04-21"
+
+figures:
+  example: { width: "\\textwidth" }   # picks figures/example/example.{pdf,png,svg,html} per target
+
+tables:
+  subgroup_summary: { source: tables/subgroup_summary.csv, format: csv }
 ```
 
-The template's [`Makefile`](https://github.com/yakaboskic/document-sanity-template/blob/main/Makefile)
-is the reference for paper repos (targets: `install`, `latex`, `pdf`,
-`preview`, `preview-check`, `html`, `word`, `serve`, `check`, `site`, `clean`).
+## Writing in Markdown
 
-## Agent skill
+````markdown
+We analyzed {{NUM_SAMPLES:,}} samples ($p = {{PVAL:.2e}}$), summarized in Table \ref{tab:subgroups}.
 
-`skills/document-sanity/` is a skill for coding agents: a router
-(`SKILL.md`, invoked as `/document-sanity [mode]` in Claude Code) and one file
-per mode under `modes/`: `_shared` (the ground rules), `init`, `onboard`
-(Word / PDF / CSV sources → a new document), `iterate` (the edit → preview →
-build loop), `figures` (including draw.io sync), `variables`, `cite`, `word`
-(the .docx template and styles), `version`, `import` (LaTeX → markdown),
-`check` and `deploy`.
+{{tab:subgroup_summary}}
 
-- **It explains; the CLI does.** Every mode works through commands
-  (`new-version`, `preview`, `check`, `pages init`, …) rather than having
-  the agent write generated files. When a step is deterministic, it belongs
-  in the CLI.
-- **It finds the project** from its sentinel files (a `pyproject.toml` that
-  depends on document-sanity, next to `src/<doc>/manifest.yaml`) and resolves
-  every path from there.
-- **It checks the version.** It runs `document-sanity --version`, and when
-  that differs from the version the skill was written for, it trusts
-  `--help` over its own text.
-- **It ends every iteration with `preview`**, and runs `check` before saying
-  done.
-- **It asks before anything public.** The deploy mode warns that a Pages site
-  is public even from a private repository, waits for a yes, and won't
-  publish a document with a `metadata.notice` unless the owner says so.
+```latex
+\begin{figure}[h!]
+    \centering
+    {{fig:example}}
+    \caption{The framework at a glance.}
+    \label{fig:overview}
+\end{figure}
+```
+````
 
-The wheel carries the skill. `init` installs it into new projects, and
-`document-sanity skills [--force]` installs or refreshes it in an existing
-one. Run that after upgrading, so the skill matches the tool. The repo is also
-a Claude Code plugin (`.claude-plugin/plugin.json`).
+- **Numbers** come from `{{NAME}}` or `{{NAME:fmt}}` with Python-style specs (`:,`, `:.2f`, `:.2e`, `:.1%`). An undefined name renders as `XXXX` and is reported, never silently blank.
+- **Figures** live in `figures/<id>/` in as many formats as you have; each target picks its best (PDF prefers vector, HTML prefers interactive HTML or SVG, Word prefers raster). See [docs/figures.md](docs/figures.md).
+- **Tables** come from CSV, TSV, Markdown or LaTeX files via `{{tab:<id>}}`, or as plain pipe tables inline.
+- **Citations and references** are LaTeX-shaped everywhere: `\cite{key}` against `references.bib`, and `\ref{fig:…}` / `tab:` / `eq:` labels numbered in every output ([docs](docs/references-and-labels.md)).
+- **LaTeX where it counts.** Anything Markdown can't say goes in a ```` ```latex ```` block. `document-sanity preview` writes a readable stand-in next to each one so GitHub, VS Code and Obsidian show something real ([docs](docs/preview-blocks.md)).
 
 ## Check before you share
 
@@ -181,18 +191,11 @@ uv run document-sanity check manuscript   # or some (inside src/<doc>/, that one
 uv run document-sanity check --no-pdf     # no TeX here
 ```
 
-For each document, in order: `preview --check` (every ```latex block's
-preview is current), the LaTeX build compiled to PDF (`!` errors in the log
-fail it; no TeX installed is a warning), unresolved references (undefined
-`{{VARIABLES}}`, `\cite` keys missing from `references.bib`, `\ref`s with no
-`\label`, sections listed but missing), the HTML viewer, and the Word file
-(laid out, as `document-sanity word` makes it). The builders' output is
-captured and shown only for a failing step (`-v` shows everything). It exits
-non-zero on any error, so it works in CI too. All outputs land in `out/<doc>/`
-as usual.
+For each document, in order: `preview --check` (every ```` ```latex ```` block's preview is current), the LaTeX build compiled to PDF (`!` errors in the log fail it; no TeX installed is a warning), unresolved references (undefined `{{VARIABLES}}`, `\cite` keys missing from `references.bib`, `\ref`s with no `\label`, sections listed but missing), the HTML viewer, and the Word file. Builder output is shown only for a failing step (`-v` shows everything). It exits non-zero on any error, so it works in CI too.
 
 ## Publish on GitHub Pages
 
+> [!WARNING]
 > A GitHub Pages site is **public**, even when the repository is private.
 
 ```bash
@@ -200,47 +203,96 @@ uv run document-sanity pages init          # asks first (--yes once the owner ag
 uv run document-sanity site                # what the workflow will publish → site/
 ```
 
-`pages init` writes `.github/workflows/pages.yml`. On each push to `main` it:
+`pages init` writes `.github/workflows/pages.yml`. On each push to `main` it checks out the repo, installs a TeX Live subset from Ubuntu's packages, runs `uv sync --locked`, runs `document-sanity site` (every document's HTML viewer, PDF and Word, with an index page) and deploys `site/`. Then turn Pages on (Settings → Pages → Source: **GitHub Actions**) and push. The [template's own demo](https://document.sanitism.dev/) is built exactly this way.
 
-1. checks out the repo, sets up uv, and installs a TeX Live subset from
-   Ubuntu's packages (`texlive-latex-recommended`, `texlive-latex-extra`,
-   `texlive-fonts-recommended`, `lmodern`: pdflatex, bibtex, natbib, …);
-2. runs `uv sync --locked` (the project's pinned document-sanity);
-3. runs `document-sanity site`: every document under `src/` → its HTML
-   viewer, PDF and Word file, gathered into `site/` with an index page;
-4. uploads `site/` and deploys it.
+- **The privacy gate.** `pages init` asks before writing anything (with no terminal, it refuses without `--yes`). A document whose manifest sets `metadata.notice` is refused unless `--allow-notice`, and the workflow enforces the same rule on every build, so a notice added later stops the deploy instead of publishing it. Name documents to publish only those: `pages init manuscript`.
+- **PDFs need TeX on the runner.** The apt subset adds a minute or two per run; `--no-pdf` leaves TeX out and publishes HTML and Word only.
+- **Options:** `--branch` (default `main`), `--only-repo OWNER/NAME` (forks and template copies skip the job), `--force` to regenerate.
+- **Any static host works.** Every link in `site/` is relative, so the same folder works on S3, Netlify or an intranet share under any URL prefix.
 
+## Versions are folders
+
+```bash
+uv run document-sanity new-version --source manuscript                  # → MMDDYYYY-<fun-name>/
+uv run document-sanity new-version --source manuscript --strategy date  # MMDDYYYY
+uv run document-sanity new-version --source proposal --name resubmission
 ```
-site/index.html              one card per document: read online · PDF · Word
-site/<doc>/index.html        the HTML viewer (with a small "all documents · PDF · Word" pill)
-site/<doc>/<doc>.pdf, .docx
+
+The original stays as the archived snapshot. Without `--source` it copies the latest version: the newest dated folder, or else the last name alphabetically. `build`, `html` and `preview` default to that latest version too.
+
+**Coming from a LaTeX project?** `document-sanity import --source ./old-paper --target ./new-paper --manuscript <name> --version <ver>` walks a `versions/<name>/main_<ver>.tex` + `sections/<name>/<ver>/*.tex` layout and writes a `src/<ver>/` tree: sections become Markdown, environments that can't be translated losslessly stay in ```` ```latex ```` blocks, and variables, the bibliography and figures come along.
+
+<details>
+<summary><b>Word output in detail</b></summary>
+
+Drop a `.docx` into `templates/` and point `metadata.word_template` at it.
+
+- **Styles** are extracted from the template's `styles.xml` + `theme1.xml` (Title, Heading 1–3, Normal, accent colors) and applied to the generated body. `word --extract-styles` dumps them; pass `--styles path.json`, or `metadata.word_styles`, to override after hand-tuning.
+- **Body only.** The template's `<w:sectPr>` (headers, footers, margins, theme refs) is kept; the body is replaced.
+- **Variables, figures and citations** resolve as in the LaTeX build. Figures are embedded as centered drawings with captions (Word prefers `png/jpg/gif/bmp`); `\cite{key}` renders as numbered `[N]` with a References section where `_bibliography` sits.
+- **Math** becomes native Word equations.
+- **Layout.** Table rows don't split and header rows repeat, headings keep with the next paragraph, figures keep with their captions, and equations take the body font size. `--no-layout` skips this pass.
+
+</details>
+
+<details>
+<summary><b>The HTML viewer in detail</b></summary>
+
+`document-sanity html` writes one `index.html` (plus copied figures):
+
+- a left contents sidebar with scroll-spy;
+- client-side KaTeX math, with the template's `\newcommand` macros registered automatically;
+- clickable variables: a provenance panel slides in with the description, an inputs → command → output graph and the updated date;
+- a hyperlinked bibliography rendered from `references.bib`;
+- figures as `<img>`, `.html` figures (Plotly) as `<iframe>`, PDFs as `<embed>`.
+
+It is self-contained apart from the Tailwind and KaTeX CDNs. Serve it with `python3 -m http.server` from `html/`. See [docs/html-viewer.md](docs/html-viewer.md).
+
+</details>
+
+## Agent skill
+
+`init` installs a skill for coding agents into `.claude/skills/document-sanity/` (Claude Code: `/document-sanity [mode]`) and `.agents/skills/document-sanity/` (other agents). Ask for the work instead of looking up flags:
+
+| Ask | What happens |
+|---|---|
+| `/document-sanity onboard` | A folder of Word files, PDFs and CSVs becomes a new document. |
+| `/document-sanity iterate` | The edit → preview → build loop. |
+| `/document-sanity check` | Every output built, every reference resolved, before you share. |
+| `/document-sanity deploy` | GitHub Pages, after confirming the work is meant to be public. |
+
+The other modes: `init`, `figures` (including draw.io sync), `variables`, `cite`, `word`, `version` and `import`.
+
+- **It explains; the CLI does.** Every mode works through commands rather than having the agent write generated files.
+- **It finds the project** from its sentinel files (a `pyproject.toml` that depends on document-sanity, next to `src/<doc>/manifest.yaml`).
+- **It checks the version.** When `document-sanity --version` differs from the version it was written for, it trusts `--help` over its own text.
+- **It ends every iteration with `preview`**, runs `check` before saying done, and asks before anything public.
+
+The wheel carries the skill; `document-sanity skills [--force]` refreshes it after an upgrade. The repo is also a Claude Code plugin (`.claude-plugin/plugin.json`).
+
+## House rules
+
+```yaml
+# sanitism.yaml
+principles:
+  one_manifest: everything else is generated, never hand-edited
+  every_number_has_a_source: the file, command and date travel with the value
+  versions_are_folders: not branches, and not final_v3_REAL.docx
+  one_repo_per_obsession: papers, proposals and talks share figures and numbers
+  same_input_same_output: a rebuild never surprises your co-authors
 ```
 
-Then turn Pages on (Settings → Pages → Source: **GitHub Actions**, or
-`gh api -X POST repos/OWNER/REPO/pages -f build_type=workflow`) and push.
+## Documentation
 
-**PDFs need TeX on the runner.** The apt subset is the template's needs
-plus headroom, needs no third-party action, and adds about a minute or two to
-each run. A template that `\usepackage`s something outside it fails the
-deploy with a missing `.sty`. `pages init --no-pdf` leaves TeX out entirely
-and publishes the HTML viewer and Word only (fast, nothing to install).
+The conventions, in detail, under [`docs/`](./docs):
 
-**The privacy gate.** `pages init` asks before writing anything (or, with no
-terminal, refuses without `--yes`). A document whose manifest sets
-`metadata.notice` (a CUI banner, a distribution statement) is refused unless
-`--allow-notice`, and the workflow's `site` call enforces the same rule on
-every build, so a notice added later stops the deploy instead of publishing
-it. To publish some documents only, name them: `pages init manuscript`.
-
-Options: `--branch` (default `main`), `--only-repo OWNER/NAME` (forks and
-template copies skip the job; the template uses this for its own demo),
-`--force` to regenerate. Action versions at the time of writing:
-`actions/checkout@v7`, `configure-pages@v6`, `upload-pages-artifact@v5`,
-`deploy-pages@v5`, and `astral-sh/setup-uv@v10.3.0` (setup-uv publishes no
-floating major tag past v7).
-
-Every link in `site/` is relative, so the same folder works on any static
-host (`aws s3 sync`, Netlify, an intranet share) under any URL prefix.
+- [Figures](./docs/figures.md): one folder per figure, per-target format choice, whitespace cropping.
+- [draw.io figures](./docs/drawio-figures.md): composed figures whose source assets re-import on demand.
+- [References & labels](./docs/references-and-labels.md): `fig:` / `tab:` / `eq:` prefixes drive numbering.
+- [Preview blocks](./docs/preview-blocks.md): readable stand-ins for ```` ```latex ```` blocks on GitHub.
+- [Variables & provenance](./docs/variables-and-provenance.md): `{{VAR:fmt}}` and the provenance panel.
+- [HTML viewer](./docs/html-viewer.md) and the [multi-plot standard](./docs/html-multi-plot-standard.md).
+- [Bibliography](./docs/bibliography.md) and [Word](./docs/word.md).
 
 ## Install the tool directly
 
@@ -254,9 +306,7 @@ uv run document-sanity --help
 uv run pytest
 ```
 
-To iterate on the tool against a real project, clone
-[`document-sanity-template`](https://github.com/yakaboskic/document-sanity-template)
-alongside this repo and point its dependency at the local checkout:
+To iterate on the tool against a real project, clone [`document-sanity-template`](https://github.com/yakaboskic/document-sanity-template) alongside this repo and point its dependency at the local checkout:
 
 ```toml
 [tool.uv.sources]
@@ -295,238 +345,10 @@ only through a release. Each release also carries a snapshot of the template
    lock, one reason `init` leaves `uv.lock` out (in every mode): a new
    project's first `uv sync` writes its own.
 
-## Project layout
+## Lineage
 
-A paper project has this shape:
+document-sanity grew out of [meta-sanity](https://github.com/yakaboskic/meta-sanity), which expands one YAML file into the meta files a research pipeline needs. The same idea (declare it once, generate the rest) applied to papers. The Word output started as [word-builder](https://github.com/yakaboskic/word-builder), now ported here as the `word` command.
 
-```
-my-paper/
-├── pyproject.toml              # declares document-sanity dependency
-├── templates/
-│   ├── article.tex             # or nature.tex for sn-jnl (Springer Nature)
-│   ├── *.cls / *.bst           # class + bib style files copied into build
-├── src/
-│   ├── 03302026/               # MMDDYYYY-named version directory
-│   │   ├── manifest.yaml       # single source of configuration
-│   │   ├── docs/               # *.md sections, in manifest.sections order
-│   │   ├── figures/            # png/jpg/pdf/html images
-│   │   ├── tables/             # optional: legacy .tex tables (can inline)
-│   │   └── references.bib      # bibliography
-│   └── 04202026-elegant-fox/   # another snapshot
-└── out/                        # generated — gitignored
-    └── 03302026/
-        ├── latex/main.tex      # compilation-ready LaTeX
-        ├── pdf/main.pdf        # compiled PDF
-        └── html/index.html     # interactive viewer
-```
+---
 
-## manifest.yaml
-
-Single source of truth per version:
-
-```yaml
-metadata:
-  title: "My Paper Title"
-  authors:
-    - name: "First Author"
-      email: "first@example.com"
-      affiliations: [1]
-  affiliations:
-    1:
-      department: "Department"
-      institution: "University"
-  abstract: |
-    Paper abstract. Variable tokens like {{NUM_SAMPLES:,}} and inline math
-    $p = {{PVAL:.2e}}$ are substituted at build time.
-  keywords: [genetics, drug-targets, bayesian]
-  template: nature              # or article; loads templates/<name>.tex
-  # Optional: set apart above the first section in every output (centered,
-  # italic, small type). For legends, CUI banners, distribution statements.
-  notice: |
-    This document contains proprietary data; see the restriction notice.
-
-sections:
-  - docs/introduction.md
-  - docs/methods.md
-  - docs/results.md
-  - docs/discussion.md
-  - _bibliography              # pseudo-section: inserts \bibliography{} here
-  - docs/supplementary.md
-
-variables:
-  NUM_SAMPLES: 1000             # simple form
-  PVAL:                         # full form with provenance (powers the
-    value: 0.0087               # interactive HTML viewer's panel)
-    provenance:
-      source: data/results.csv
-      data: [data/raw.parquet]
-      command: python scripts/fit.py --out data/results.csv
-      description: Primary p-value from the genome-wide regression.
-      updated: "2026-04-20"
-
-figures:
-  fig_1:
-    source: figures/overview.png
-    width: "\\textwidth"
-  "2":                          # canva page mapping; {{canva:2}} resolves here
-    source: figures/pigean-figure-1.png
-
-tables:
-  results_summary:
-    source: tables/results.tex
-    format: latex
-```
-
-## Variable and figure syntax in markdown
-
-```markdown
-We analyzed {{NUM_SAMPLES:,}} samples ($p = {{PVAL:.2e}}$).
-
-```latex
-\begin{figure}[h!]
-    \centering
-    {{fig:fig_1}}
-    \caption{Framework overview.}
-    \label{fig:overview}
-\end{figure}
-```
-```
-
-**Supported format specs** (Python-style): `:.2f`, `:.2e`, `:,`, `:.1%`.
-
-Undefined variables render as `XXXX` (configurable via `--placeholder`) and
-are reported in the build summary.
-
-## Preview blocks
-
-`document-sanity preview` auto-generates a markdown approximation next to each
-```latex block so GitHub renders something useful:
-
-~~~markdown
-```latex
-\begin{figure}[h!]
-    \includegraphics[width=\textwidth]{figures/overview.png}
-    \caption{Framework overview.}
-    \label{fig:overview}
-\end{figure}
-```
-
-<!-- document-sanity:preview:begin hash=a1b2c3d4 -->
-![Framework overview.](../figures/overview.png)
-<!-- document-sanity:preview:end -->
-~~~
-
-- Block kinds handled: `figure`/`figure*`, `table`/`table*`/`longtable`,
-  `align`/`equation`/`eqnarray`/`gather`/`multline` and their starred variants.
-- Template `\newcommand` macros (e.g. `\prob` → `\text{Pr}`) auto-expand inside
-  `$...$`, `$$...$$`, `\[...\]` math so KaTeX-based viewers don't choke.
-- `.pdf` figures fall back to a sibling `.png` if one exists (md viewers
-  can't render PDFs).
-- Paths are computed relative to the doc's own directory.
-- Hand-edits between `preview:begin/end` markers get overwritten; edit the
-  source ```latex block instead.
-- `preview --check` returns non-zero on drift — wire into CI.
-
-## Interactive HTML viewer
-
-`document-sanity html` emits a single `index.html` (plus copied `figures/`)
-with:
-
-- Left sidebar TOC with scroll-spy and hyperlinked headings.
-- Client-side KaTeX math, with `\newcommand` macros from the template
-  registered automatically.
-- Clickable variable tokens — a **right-side provenance panel** slides in
-  showing description, an inputs→command→output graph, and the updated
-  timestamp. The clicked token stays outlined while the panel is open.
-- Hyperlinked bibliography: `\cite{key}` → numbered link → entry rendered
-  from `references.bib`.
-- Figures: `.png`/`.jpg` → `<img>`, `.html` → `<iframe>` (great for Plotly),
-  `.pdf` → `<embed>`.
-- Self-contained: only external deps are Tailwind Play CDN and KaTeX CDN.
-  Serve with `python3 -m http.server` from the `html/` directory.
-
-## Build pipeline
-
-```
-                             ┌─► out/<ver>/latex/main.tex ──► out/<ver>/pdf/main.pdf
-src/<ver>/docs/*.md     ─┐   │
-src/<ver>/manifest.yaml ─┼───┼─► out/<ver>/html/index.html
-src/<ver>/figures/       │   │
-templates/<tmpl>.tex    ─┤   └─► out/<ver>/word/main.docx
-templates/<tmpl>.docx   ─┘
-```
-
-The same markdown sources feed PDF (via LaTeX), HTML, and Word simultaneously.
-Section order and bibliography placement are controlled from
-`manifest.sections`. `_bibliography` is a pseudo-section that inserts
-`\bibliography{references}` (LaTeX) / a References section (Word) /
-a bibliography pane (HTML) at that point; `_toc` similarly for
-`\tableofcontents`.
-
-## Versioning
-
-```bash
-document-sanity new-version --source manuscript                  # → MMDDYYYY-<fun-name>/
-document-sanity new-version --source manuscript --strategy date  # MMDDYYYY
-document-sanity new-version --source manuscript --strategy fun   # elegant-crimson-fox
-document-sanity new-version --source proposal --name resubmission
-```
-
-Without `--source` it copies the latest version, which is the newest dated
-folder, or else the last name alphabetically.
-
-`document-sanity build` / `html` / `preview` all auto-detect the latest
-dated version if `--version` isn't given.
-
-## Importing an existing LaTeX project
-
-```bash
-document-sanity import \
-  --source ./my-old-paper \
-  --target ./my-new-paper \
-  --manuscript indirect-support \
-  --version 03302026 \
-  --name 03302026
-```
-
-Walks `versions/<manuscript>/main_<ver>.tex` + `sections/<manuscript>/<ver>/*.tex`
-and produces a `src/<ver>/` tree: sections become `.md` with ```latex blocks
-preserving environments we can't losslessly markdown-ify (figures, tables,
-align, etc.), variables are copied from `variables/<manuscript>.json`, the
-bib and figures are brought along.
-
-## Word (.docx) output
-
-Drop a `.docx` template into `templates/` and `document-sanity word` emits a
-Word document from the same markdown sources:
-
-```
-templates/apiflow.docx         # headers, footers, theme, fonts — all preserved
-src/<ver>/manifest.yaml        # points at it via metadata.word_template: apiflow
-src/<ver>/docs/*.md            # same sections as the LaTeX build
-```
-
-- **Styles** are extracted from the template's `styles.xml` + `theme1.xml`
-  (Title / Heading 1-3 / Normal, accent colors) and applied to the generated
-  body. Pass `--styles path.json` to override after hand-tuning.
-- **Variables** (`{{VAR}}`, `{{VAR:.2e}}`) resolve the same way as in the
-  LaTeX build, using `manifest.variables`.
-- **Figures** — `![alt](path)` and ` ```latex \includegraphics{path} ``` `
-  blocks are embedded inline as centered drawings with a caption. The
-  `'word'` target prefers `png/jpg/gif/bmp` (DOCX has no native PDF/SVG).
-- **Bibliography** — `\cite{key}` renders as numbered `[N]` inline;
-  duplicate keys reuse the same number. A `References` section is appended
-  at the end (or wherever `_bibliography` is placed in `manifest.sections`).
-- **Body preservation** — only the template's `<w:sectPr>` (headers,
-  footers, margins, theme refs) is kept. Body content is replaced.
-- **Layout** — table rows don't split and the header row repeats, headings
-  keep with the next paragraph, figures keep with their captions, and
-  equations take the body font size. `--no-layout` skips this pass.
-
-## Library inspiration
-
-- [word-builder](https://github.com/yakaboskic/word-builder) — CLI architecture,
-  docx-template philosophy (now ported into this project as the `word`
-  subcommand).
-- [pigean-manuscripts](https://github.com/yakaboskic/pigean-manuscripts) —
-  original build system, variable processor, figure manifest, versioning scheme.
+<sub>Part of <a href="https://sanitism.dev">Sanitism</a>. Also in the family: <a href="https://github.com/yakaboskic/presentation-sanity">presentation-sanity</a> for talks. MIT licensed.</sub>

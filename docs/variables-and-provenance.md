@@ -27,7 +27,7 @@ Supported format specs (Python-style, after the colon):
 | `:fmt` | any Python `format()` spec | `"03d"` → `042` |
 
 Variable names are `[A-Za-z_][A-Za-z0-9_]*` — mixed case works (useful
-for computed identifiers like `NUM_PIGEAN_AT_RS_eq_OTG_INDIRECT`).
+for computed identifiers like `N_HITS_FDR05_Indirect`).
 
 Undefined variables render as `XXXX` (configurable via `--placeholder`)
 and are listed in the build summary so you can see what still needs a
@@ -50,18 +50,17 @@ fields drive the HTML viewer's side panel:
 
 ```yaml
 variables:
-  PIGEAN_COMBINED_RS_ALL:
+  EFFECT_SIZE_ALL:
     value: 1.90
     provenance:
       description: >
-        Relative success of PIGEAN combined support across all
-        therapeutic areas, computed against the Pharmaprojects trials
-        database.
-      source: data/pigean_combined_posteriors.parquet
+        Pooled effect size across all cohorts, from the random-effects
+        meta-analysis.
+      source: data/meta_analysis.parquet
       data:
-        - data/pharmaprojects_outcomes.parquet
-        - data/minikel_otg_curation.tsv
-      command: python scripts/compute_rs.py --evidence combined --target pharmaprojects
+        - data/cohort_estimates.parquet
+        - data/cohort_metadata.tsv
+      command: python scripts/meta_analysis.py --model random-effects
       updated: "2026-03-28"
 ```
 
@@ -117,7 +116,7 @@ only consumed by the HTML builder. The PDF gets the value, full stop.
 ## Scope and priority
 
 One `variables:` block per version in `manifest.yaml`. The top-level
-`shared.json` file (legacy from pigean-manuscripts) is still loaded for
+`shared.json` file (legacy from an earlier build system) is still loaded for
 back-compat: values from `manifest.yaml` override values from
 `shared.json` which override the default placeholder.
 

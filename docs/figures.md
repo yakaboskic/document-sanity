@@ -30,11 +30,11 @@ figures:
     width: "\\textwidth"          # passed through to \includegraphics
 
   "4":                            # canva page mapping — {{canva:4}} resolves here
-    source: figures/pigean-figure-3/pigean-figure-3.png   # optional target-agnostic fallback
+    source: figures/overview/overview.png   # optional target-agnostic fallback
     formats:                       # optional explicit per-target overrides
-      pdf:     figures/pigean-figure-3/pigean-figure-3.pdf
-      html:    figures/pigean-figure-3/pigean-figure-3.html
-      preview: figures/pigean-figure-3/pigean-figure-3.png
+      pdf:     figures/overview/overview.pdf
+      html:    figures/overview/overview.html
+      preview: figures/overview/overview.png
 ```
 
 - `source:` — a single path used for all targets when nothing else matches.
@@ -65,14 +65,14 @@ skips `pdf` / `html` because markdown viewers can't render them.
 
 ## Canva pages
 
-The legacy pigean-manuscripts convention treats numeric figure IDs (`"2"`,
+An older convention, from manuscripts whose figures were laid out as Canva pages, treats numeric figure IDs (`"2"`,
 `"3"`, …) as Canva page numbers. `{{canva:3}}` in markdown looks up the
 manifest entry keyed `"3"`. Use `source:` pointing into the figure's subdir
 to wire Canva pages to the new directory layout:
 
 ```yaml
 "3":
-  source: figures/pigean-figure-2/pigean-figure-2.png
+  source: figures/framework/framework.png
 ```
 
 Add `formats.html` alongside if the figure also has an interactive version.
@@ -84,9 +84,9 @@ with `rglob` and copy every image file, but with a **flattened basename**
 as the destination filename:
 
 ```
-src/03302026/figures/suppfig1/suppfig1.pdf   →  out/03302026/latex/figures/suppfig1.pdf
-src/03302026/figures/pigean-figure-3/
-    pigean-figure-3.html                     →  out/03302026/html/figures/pigean-figure-3.html
+src/manuscript/figures/suppfig1/suppfig1.pdf   →  out/manuscript/latex/figures/suppfig1.pdf
+src/manuscript/figures/overview/
+    overview.html                              →  out/manuscript/html/figures/overview.html
 ```
 
 This is why hardcoded paths in ```latex blocks that reference
