@@ -1,0 +1,13 @@
+{
+  "name": "document-sanity",
+  "version": "0.2.0",
+  "description": "Papers and proposals from markdown and one manifest.yaml per document: PDF via LaTeX, an interactive HTML viewer and Word, every number with provenance. /document-sanity [init | onboard | iterate | figures | variables | cite | word | version | import | check | deploy]. Part of Sanitism.",
+  "author": {
+    "name": "yakaboskic",
+    "url": "https://github.com/yakaboskic"
+  },
+  "homepage": "https://sanitism.dev",
+  "repository": "https://github.com/yakaboskic/document-sanity",
+  "license": "MIT",
+  "keywords": ["latex", "markdown", "word", "docx", "manuscripts", "provenance", "sanitism"]
+}
