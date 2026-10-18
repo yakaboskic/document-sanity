@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 import re
 import shutil
 import subprocess
@@ -78,12 +79,13 @@ def test_init_into_new_dir_applies_answers(tmp_path: Path, capsys) -> None:
     for rel in ip.TEMPLATE_ONLY:
         assert not (dest / rel).exists()
     assert not (dest / ".git").exists()
+    assert not (dest / "uv.lock").exists()  # the first `uv sync` writes it
     for base in ip.SKILL_DIRS:
         assert (dest / base / "document-sanity" / "SKILL.md").is_file()
         assert (dest / base / "document-sanity" / "modes" / "_shared.md").is_file()
 
     out = capsys.readouterr().out
-    assert "uv sync" in out and "document-sanity check" in out
+    assert "uv sync" in out and "uv.lock" in out and "document-sanity check" in out
 
 
 def test_init_keeps_only_the_chosen_starter(tmp_path: Path, capsys) -> None:
@@ -150,12 +152,14 @@ def test_bad_answers_are_refused() -> None:
 
 def test_knit_into_current_dir_keeps_other_files(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / "notes.txt").write_text("mine\n")
+    (tmp_path / "uv.lock").write_text("my lock\n")  # never a conflict: not copied
     (tmp_path / "data").mkdir()
     (tmp_path / "data" / "results.csv").write_text("a,b\n")
     monkeypatch.chdir(tmp_path)
     assert main(["init", ".", *ANSWERS]) == 0
     assert (tmp_path / "notes.txt").read_text() == "mine\n"
     assert (tmp_path / "data/results.csv").read_text() == "a,b\n"
+    assert (tmp_path / "uv.lock").read_text() == "my lock\n"
     assert (tmp_path / "src/manuscript/manifest.yaml").is_file()
 
 
@@ -212,6 +216,57 @@ def test_git_makes_a_first_commit(tmp_path: Path, monkeypatch) -> None:
     assert ".claude/skills/document-sanity/SKILL.md" in tracked
 
 
+# ── uv.lock ──────────────────────────────────────────────────────────────────
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
+def test_gitignore_keeps_uv_lock(tmp_path: Path) -> None:
+    """The Pages workflow installs with `uv sync --locked`: the lock must be committed."""
+    dest = tmp_path / "x"
+    ip.create_project(dest, answers(), skills=False)
+    subprocess.run(["git", "init", "-q"], cwd=dest, check=True)
+    ignored = subprocess.run(["git", "check-ignore", "--no-index", "-q", "uv.lock"], cwd=dest)
+    assert ignored.returncode == 1, "uv.lock is gitignored"
+
+
+@pytest.mark.skipif(
+    shutil.which("uv") is None or shutil.which("git") is None, reason="needs uv and git"
+)
+@pytest.mark.skipif(not re.fullmatch(r"\d+\.\d+\.\d+", __version__), reason="not a release version")
+def test_first_lock_resolves_the_pinned_tag(tmp_path: Path) -> None:
+    """The lock a new project's first `uv sync` writes pins the release that made it.
+
+    GitHub stands in as a local bare clone of this checkout, tagged v<version>
+    (git's insteadOf), so this works before the tag is pushed. PyPI
+    packages come from uv's cache or the index.
+    """
+    repo = Path(__file__).resolve().parent.parent
+    if not (repo / ".git").exists():
+        pytest.skip("not a git checkout")
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "clone", "-q", "--bare", str(repo), str(remote)], check=True)
+    subprocess.run(["git", "-C", str(remote), "tag", "-f", f"v{__version__}", "HEAD"],
+                   check=True, capture_output=True)
+    gitconfig = tmp_path / "gitconfig"
+    gitconfig.write_text(
+        f'[url "file://{remote}"]\n'
+        "\tinsteadOf = https://github.com/yakaboskic/document-sanity.git\n"
+    )
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": str(gitconfig), "GIT_CONFIG_NOSYSTEM": "1",
+           "UV_NO_GITHUB_FAST_PATH": "1"}
+
+    dest = tmp_path / "x"
+    ip.create_project(dest, answers(), skills=False)
+    assert not (dest / "uv.lock").exists()
+    lock = subprocess.run(["uv", "lock"], cwd=dest, env=env, capture_output=True, text=True)
+    assert lock.returncode == 0, lock.stderr
+    text = (dest / "uv.lock").read_text()
+    pinned = f"document-sanity.git?rev=v{__version__}#"
+    assert pinned in text, text[:2000]
+    # what CI's `uv sync --locked` checks first
+    locked = subprocess.run(["uv", "lock", "--locked"], cwd=dest, env=env, capture_output=True, text=True)
+    assert locked.returncode == 0, locked.stderr
+
+
 # ── --in-place (the template's init.py) ─────────────────────────────────────
 
 def template_copy(tmp_path: Path) -> Path:
@@ -236,6 +291,8 @@ def test_in_place_renames_and_removes_template_files(tmp_path: Path) -> None:
     assert not (root / ".github").exists()  # no empty folders left behind
     assert (root / ".claude/skills/document-sanity/SKILL.md").is_file()
     assert (root / "README.md").read_text().startswith("# demo-paper")
+    # the template repo's own lock is current: in place, it stays
+    assert (root / "uv.lock").read_bytes() == ip.bundled_template()[0]["uv.lock"]
     # a second run finds nothing to initialize
     assert main(["init", str(root), "--in-place", *ANSWERS]) == 1
 
@@ -301,6 +358,7 @@ def test_init_from_github_fork(tmp_path: Path, monkeypatch) -> None:
     assert seen == ["https://api.github.com/repos/lab/paper-template/tarball/v2"]
     assert (dest / "LAB.md").read_text() == "lab house rules\n"
     assert not (dest / "init.py").exists()
+    assert "uv.lock" in fork and not (dest / "uv.lock").exists()
     # a fork's pin is the fork's business: left as the fork wrote it
     assert "document-sanity.git@v0.1.9" in (dest / "pyproject.toml").read_text()
 

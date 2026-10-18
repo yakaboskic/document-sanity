@@ -53,9 +53,13 @@ the user doesn't keep, installs this skill, and removes itself.
 
 ```bash
 cd DIR
-uv sync                                   # installs the pinned document-sanity
+uv sync                                   # installs the pinned document-sanity, writes uv.lock
 uv run document-sanity check --no-pdf     # HTML + Word build, previews current
 ```
+
+`init` doesn't copy the template's `uv.lock`; the first `uv sync` writes one
+that matches the pin. If the project uses git, commit it: the Pages workflow
+installs with `uv sync --locked`.
 
 PDFs need a TeX distribution with `pdflatex` and `bibtex` (MacTeX or
 BasicTeX on macOS, `texlive-latex-extra` on Debian/Ubuntu). If it's missing,

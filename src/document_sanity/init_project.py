@@ -42,6 +42,13 @@ TEMPLATE_REPO = "yakaboskic/document-sanity-template"
 # it: the bootstrap shim, and the workflow that deploys the template's demo
 # (Pages is opt-in per project — `document-sanity pages init`).
 TEMPLATE_ONLY = ("init.py", ".github/workflows/pages.yml")
+# Not copied into a new project: the template's lock. The snapshot a release
+# ships is taken before the template is re-locked against that release's tag,
+# so its lock always pins the previous tool, and `uv sync --locked` (the Pages
+# workflow) would refuse it. The project's first `uv sync` writes its own.
+# `--in-place` leaves a template copy's lock alone: the template repo's own is
+# current.
+NOT_COPIED = ("uv.lock",)
 
 SKILL_NAME = "document-sanity"
 # Claude Code reads .claude/skills/; Codex, Pi, Cursor and other agents read
@@ -369,7 +376,7 @@ def render_readme(a: Answers, docs: list[str]) -> str:
     first = docs[0] if docs else "manuscript"
     listing = "\n".join(f"- `src/{d}/`" for d in docs) or "- (none yet)"
     develop = commented([
-        ("uv sync", "installs document-sanity (pinned)"),
+        ("uv sync", "installs document-sanity (pinned), writes uv.lock"),
         (f"uv run document-sanity preview -V {first}", "refresh preview blocks (after every edit)"),
         (f"make pdf VERSION={first}", f"→ out/{first}/pdf/main.pdf (needs TeX)"),
         (f"make html VERSION={first}", f"→ out/{first}/html/index.html"),
@@ -398,7 +405,9 @@ Every folder under `src/` with a `manifest.yaml` is a document:
 ```
 
 `make help` lists the rest. Without `VERSION=`, commands pick the latest
-document under `src/`.
+document under `src/`. Commit the `uv.lock` the first `uv sync` writes: it
+pins every dependency, and the GitHub Pages workflow installs from it with
+`--locked`.
 
 An agent skill lives in `.claude/skills/document-sanity/` (Claude Code:
 `/document-sanity`) and `.agents/skills/document-sanity/` (other agents).
@@ -541,6 +550,7 @@ def create_project(
     """
     bundled = source is None
     files, label = bundled_template() if bundled else source
+    files = {rel: data for rel, data in files.items() if rel not in NOT_COPIED}
     release = re.fullmatch(r"\d+\.\d+\.\d+", __version__) is not None
     files = apply_answers(files, answers, pin=__version__ if bundled and release else None)
     if skills:
