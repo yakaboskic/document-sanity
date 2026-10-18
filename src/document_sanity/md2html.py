@@ -16,6 +16,8 @@ but emits HTML suitable for interactive rendering:
   in the builder, not here.
 - Images with .html extensions become <iframe> (for interactive figures like
   plotly exports); everything else is a plain <img>.
+- Inline `code` and non-latex fences are verbatim: a `\\cite{key}` in
+  backticks shows as written instead of becoming a citation.
 """
 
 import html as _html
@@ -23,6 +25,8 @@ import json
 import re
 import unicodedata
 from typing import Any, Callable, Optional
+
+from .verbatim import mask_code, unmask_code
 
 
 def slugify(text: str) -> str:
@@ -149,7 +153,23 @@ def _convert_inline(text: str,
     store: dict[str, str] = {}
     counter = [0]
 
-    # 1. Protect math FIRST so we can substitute variables inside it as plain
+    # 0. Protect inline code before anything else: `\cite{key}`, `$x$` or
+    # `{{VAR}}` in backticks is syntax to show, so none of the passes below
+    # may touch it.
+    def _code(m: re.Match) -> str:
+        key = f'\x00K{counter[0]}\x00'
+        inner = m.group(1)
+        # Strip LaTeX escape sequences; in code/HTML we want the literal chars
+        for esc, lit in [('\\_', '_'), ('\\&', '&'), ('\\%', '%'),
+                         ('\\#', '#'), ('\\$', '$'),
+                         ('\\{', '{'), ('\\}', '}')]:
+            inner = inner.replace(esc, lit)
+        store[key] = f'<code>{_escape(inner)}</code>'
+        counter[0] += 1
+        return key
+    text = re.sub(r'(?<!`)`([^`]+?)`(?!`)', _code, text)
+
+    # 1. Protect math so we can substitute variables inside it as plain
     # TeX (no span wrappers) and rewrite scientific notation into \times 10^N.
     def _protect_math(m: re.Match) -> str:
         content = m.group(0)
@@ -238,21 +258,7 @@ def _convert_inline(text: str,
         return key
     text = re.sub(r'<a id="[^"]+"></a>', _anchor, text)
 
-    # 4. Protect inline code (already handled specially)
-    def _code(m: re.Match) -> str:
-        key = f'\x00K{counter[0]}\x00'
-        inner = m.group(1)
-        # Strip LaTeX escape sequences; in code/HTML we want the literal chars
-        for esc, lit in [('\\_', '_'), ('\\&', '&'), ('\\%', '%'),
-                         ('\\#', '#'), ('\\$', '$'),
-                         ('\\{', '{'), ('\\}', '}')]:
-            inner = inner.replace(esc, lit)
-        store[key] = f'<code>{_escape(inner)}</code>'
-        counter[0] += 1
-        return key
-    text = re.sub(r'(?<!`)`([^`]+?)`(?!`)', _code, text)
-
-    # 4b. Convert \textit / \textbf / \emph / \texttt / \underline inline commands
+    # 4. Convert \textit / \textbf / \emph / \texttt / \underline inline commands
     # (they leak through from LaTeX-native source docs).
     def _textit(m: re.Match) -> str:
         key = f'\x00T{counter[0]}\x00'
@@ -475,6 +481,10 @@ def md_to_html(md_content: str,
         return ''.join(f'<a id="{_escape(lbl)}"></a>' for lbl in labels)
     text = _LATEX_FENCE_RE.sub(_replace_latex_fence, md_content)
 
+    # Code is verbatim: hold it out of the comment, preview-marker and
+    # \FloatBarrier passes below (back in before the block walk).
+    text, code = mask_code(text)
+
     # Preview markers: keep the content, drop the <!-- markers -->
     def _unwrap_preview(m: re.Match) -> str:
         return m.group(1)
@@ -495,6 +505,7 @@ def md_to_html(md_content: str,
 
     # \FloatBarrier and the like — LaTeX-only, drop
     text = re.sub(r'\\FloatBarrier\b', '', text)
+    text = unmask_code(text, code)
 
     lines = _drop_comment_lines(text.split('\n'))
     out: list[str] = []

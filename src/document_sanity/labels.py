@@ -6,13 +6,16 @@ LaTeX numbers figures, tables and equations itself; the other targets need the
 same numbers so that \\ref{fig:x} reads "Figure 3" everywhere. collect_labels
 walks the version's sections in manifest order and numbers each \\label{key}
 by its prefix (fig, tab, eq, ...), which matches LaTeX as long as each float
-carries one label.
+carries one label. A \\label{} inside code (`\\label{fig:x}` as syntax) isn't
+one, and isn't counted.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
+
+from .verbatim import blank_code
 
 LABEL_RE = re.compile(r'\\label\{([^{}]+)\}')
 
@@ -40,7 +43,7 @@ def collect_labels(manifest, src_dir: Path) -> dict[str, tuple[str, int]]:
         doc_path = src_dir / section_ref
         if not doc_path.exists():
             continue
-        content = doc_path.read_text(encoding='utf-8')
+        content = blank_code(doc_path.read_text(encoding='utf-8'))
         for m in LABEL_RE.finditer(content):
             key = m.group(1)
             if key in labels:

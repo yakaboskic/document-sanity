@@ -20,6 +20,8 @@ Pass-through ```latex fences:
 
 Citations (\\cite{key}) register with the builder via register_citation() and
 render as "[N]" inline; the caller emits the References section separately.
+Inline `code` and non-latex fences are verbatim: a `\\cite{key}` in backticks
+shows as written and registers nothing.
 
 Variable tokens ({{VAR}} / {{VAR:fmt}}) are pre-substituted by the caller via
 VariableProcessor before we get here — we don't re-substitute.
@@ -35,6 +37,7 @@ from typing import Callable, Optional
 from .docx_content import ContentBuilder, TextStyle
 from .docx_math import DISPLAY_RE, INLINE_RE, MathCache, scan
 from .docx_xml import RichText
+from .verbatim import mask_code, unmask_code
 
 
 # ---- regex library ---------------------------------------------------------
@@ -134,6 +137,9 @@ def render_markdown(
 
     text = _LATEX_FENCE_RE.sub(_stash_latex, md)
 
+    # Code is verbatim: hold it out of steps 2-4b, back in for the block walk.
+    text, code = mask_code(text)
+
     # 2. Unwrap preview blocks — keep the inner content (markdown-native).
     text = _PREVIEW_BLOCK_RE.sub(lambda m: m.group(1), text)
 
@@ -151,6 +157,7 @@ def render_markdown(
         if env:
             snippets.append((env.group(2), True))
     ctx.math.prefetch(snippets)
+    text = unmask_code(text, code)
 
     # 5. Block-level walk.
     lines = text.split("\n")
@@ -475,19 +482,23 @@ def _inline_to_rich(text: str, ctx: RenderContext) -> list[RichText]:
     (images inline — we emit an image drawing + caption before this call
     returns, via register_embedded_image). Math is left as literal text.
     """
+    # `code` is literal: hold it out of every pass below (images, math, links,
+    # \cite/\ref/\label) until the tokenizer gives it the Code style.
+    text, code = mask_code(text)
+
     # Pull out ![alt](path) images first — they're rendered as their own
     # paragraph in Word, so we emit the drawing now and drop the token.
     def _image_pull(m: re.Match) -> str:
         alt, src = m.group(1), m.group(2)
         cap = re.fullmatch(r"\x03CAP(\d+)\x03", alt)
-        caption: object = alt or None
+        caption: object = unmask_code(alt, code) or None
         if cap:  # the LaTeX caption, rendered with its formatting, math and citations
             md = ctx.captions[int(cap.group(1))]
             caption = _inline_to_rich(md, ctx)
             alt = _rich_to_text(caption)
         p = _resolve_relative_image(src, ctx)
         if p and _image_supported(p):
-            ctx.builder.image(p, caption=caption, alt_text=alt or "")
+            ctx.builder.image(p, caption=caption, alt_text=unmask_code(alt, code) or "")
             return ""
         # Fallback: show alt text in brackets so nothing is silently lost.
         return f"[{alt}]"
@@ -526,15 +537,21 @@ def _inline_to_rich(text: str, ctx: RenderContext) -> list[RichText]:
     text = _REF_RE.sub(_ref, text)
     text = _LABEL_RE.sub("", text)
 
-    # Strip LaTeX escape sequences that don't belong in plain prose.
+    # Strip LaTeX escape sequences that don't belong in plain prose (or code),
+    # then put the code back.
+    text = unmask_code(_strip_tex_escapes(text), [_strip_tex_escapes(c) for c in code])
+
+    # Now tokenize for bold/italic/code.
+    return _expand_math(_tokenize_inline(text), math_runs)
+
+
+def _strip_tex_escapes(text: str) -> str:
     for esc, lit in [
         (r"\_", "_"), (r"\&", "&"), (r"\%", "%"),
         (r"\#", "#"), (r"\$", "$"), (r"\{", "{"), (r"\}", "}"),
     ]:
         text = text.replace(esc, lit)
-
-    # Now tokenize for bold/italic/code.
-    return _expand_math(_tokenize_inline(text), math_runs)
+    return text
 
 
 def _expand_math(runs: list[RichText], math_runs: list[RichText]) -> list[RichText]:
