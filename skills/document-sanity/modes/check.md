@@ -17,7 +17,7 @@ For each document it runs, and prints one line per step:
 | `pdf` | the LaTeX build works and pdflatex compiles it with no `!` errors |
 | `refs` | every `{{VAR}}` is defined, every `\cite` key is in `references.bib`, every `\ref` has a `\label` |
 | `html` | the viewer builds → `out/<doc>/html/index.html` |
-| `word` | the .docx builds (plus `scripts/finalize_word_layout.py`) → `out/<doc>/word/main.docx` |
+| `word` | the .docx builds and is laid out → `out/<doc>/word/main.docx` |
 
 It exits non-zero on any `✗`. Fix what it reports; don't silence it. A
 stale preview: `uv run document-sanity preview -V <doc>`, then check again.

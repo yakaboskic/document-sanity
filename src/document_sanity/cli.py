@@ -570,6 +570,7 @@ def cmd_word(args: argparse.Namespace) -> int:
             placeholder=args.placeholder,
             strict=args.strict,
             verbose=args.verbose,
+            layout=not args.no_layout,
         )
         ok = builder.build()
         return 0 if ok else 1
@@ -868,6 +869,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help='Write the extracted styles.json instead of building a .docx')
     word_p.add_argument('--placeholder', default='XXXX', help='Placeholder for undefined variables')
     word_p.add_argument('--strict', action='store_true', help='Fail on undefined variables')
+    word_p.add_argument('--no-layout', action='store_true',
+                        help="Skip the layout pass (table rows, headings and figures kept "
+                             "together on a page; equations at the body font size)")
     word_p.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
 
     # --- convert ---

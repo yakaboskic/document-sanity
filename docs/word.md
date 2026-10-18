@@ -116,12 +116,40 @@ Entries render with:
 
 Multi-key cites (`\cite{smith2024,jones2025}`) render as `[1, 2]`.
 
+## Layout
+
+Every build ends with a pagination pass over the finished `.docx`
+(`docx_layout.py`):
+
+- table rows don't split across pages, and each table's first row repeats
+  as a header row on every page it spans;
+- headings keep with the paragraph after them and don't split;
+- a figure's image keeps with its caption (a `Caption`-styled paragraph or
+  one starting `Figure N:`), and the caption doesn't split;
+- equations take their paragraph's font size: `fontSizes.body` from the
+  resolved styles, or the size the paragraph sets itself (captions,
+  headings). Word would otherwise draw them at its own default.
+
+Only `word/document.xml` changes. `document-sanity word --no-layout`
+skips the pass. `check` and `site` build the same laid-out file.
+
+Projects made from an older template ship `scripts/finalize_word_layout.py`
+and run it from `make word`. The pass is idempotent, so running the script
+again changes nothing; delete it and its line in the Makefile's `word`
+target. `check -v` notes it when it's there.
+
 ## Caveats
 
-- **Blockquotes** render as inline "Note:" text, not shaded callout boxes.
-- **Equations** in `latex` blocks render as centered italic monospace — no
-  OOXML math conversion yet.
-- **Tables** inside `latex` blocks render as a placeholder; markdown pipe
-  tables render as real Word tables.
-- **Inline `code` spans** don't switch to monospace (Word doesn't inherit
-  font changes cleanly across runs in our current emit).
+- **Blockquotes** render as italic paragraphs, not shaded callout boxes.
+- **Equations** (`$…$`, `$$…$$`, and `equation`/`align`/`gather`
+  environments in `latex` blocks) become native Word equations through
+  pandoc. Without `pandoc` on the PATH, or for a snippet it can't convert,
+  the LaTeX source is written as centered italic monospace text instead.
+  Template macros that take arguments don't expand.
+- **`latex` blocks** render from their [preview block](./preview-blocks.md):
+  a table there becomes a real Word table. A `table` environment with no
+  preview renders as a caption-only placeholder, so run `preview` first.
+  Previews flatten what markdown can't hold (merged header cells, subfigure
+  panels). Markdown pipe tables and `{{tab:…}}` tables are real Word tables.
+- **Inline `code` spans** use the template's `Code` character style; if the
+  template doesn't define one, they render in the body font.

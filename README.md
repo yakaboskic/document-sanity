@@ -27,7 +27,7 @@ That's a named project from
 |---|---|---|
 | `document-sanity build --compile` | `out/<ver>/pdf/main.pdf` | Build the paper PDF. |
 | `document-sanity html --open` | `out/<ver>/html/index.html` | Interactive viewer: TOC sidebar, KaTeX math, clickable variables with a provenance panel, hyperlinked bibliography. |
-| `document-sanity word` | `out/<ver>/word/main.docx` | Build a Word document from a `.docx` template in `templates/` — styles are extracted from the template, figures are embedded, citations render as a numbered References list. |
+| `document-sanity word` | `out/<ver>/word/main.docx` | Build a Word document from a `.docx` template in `templates/` — styles are extracted from the template, figures are embedded, citations render as a numbered References list, and tables, headings and figures are kept together across page breaks (`--no-layout` skips that). |
 | `document-sanity word --extract-styles` | `out/<ver>/word/styles.json` | Dump the template's extracted styles so you can hand-tune before the next build. |
 | `document-sanity preview` | Inline preview blocks in each `.md` | Make ```latex figure/equation/table blocks render as `![alt](path)` / `$$...$$` / `\|cell\|` so GitHub shows something meaningful. Idempotent; hash-tagged. |
 | `document-sanity preview --check` | Exit 1 if stale | CI-friendly. |
@@ -186,8 +186,7 @@ preview is current), the LaTeX build compiled to PDF (`!` errors in the log
 fail it; no TeX installed is a warning), unresolved references (undefined
 `{{VARIABLES}}`, `\cite` keys missing from `references.bib`, `\ref`s with no
 `\label`, sections listed but missing), the HTML viewer, and the Word file
-plus the project's `scripts/finalize_word_layout.py` pass when it has one
-(the template does; `make word` runs the same). The builders' output is
+(laid out, as `document-sanity word` makes it). The builders' output is
 captured and shown only for a failing step (`-v` shows everything). It exits
 non-zero on any error, so it works in CI too. All outputs land in `out/<doc>/`
 as usual.
@@ -520,6 +519,9 @@ src/<ver>/docs/*.md            # same sections as the LaTeX build
   at the end (or wherever `_bibliography` is placed in `manifest.sections`).
 - **Body preservation** — only the template's `<w:sectPr>` (headers,
   footers, margins, theme refs) is kept. Body content is replaced.
+- **Layout** — table rows don't split and the header row repeats, headings
+  keep with the next paragraph, figures keep with their captions, and
+  equations take the body font size. `--no-layout` skips this pass.
 
 ## Library inspiration
 
