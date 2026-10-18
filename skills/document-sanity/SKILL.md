@@ -13,7 +13,7 @@ argument-hint: "[init | onboard | iterate | figures | variables | cite | word | 
 user-invocable: true
 license: MIT
 metadata:
-  version: "0.2.0"
+  version: "0.2.1"
   family: sanitism
 ---
 

@@ -35,7 +35,7 @@ coherent design system. Switch which version is active by passing
 plain folder (no clone, no `.git` unless you add `--git`):
 
 ```bash
-uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.0" \
+uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1" \
   document-sanity init my-paper --title "My paper" --starter manuscript
 cd my-paper && uv sync
 ```

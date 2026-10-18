@@ -10,7 +10,7 @@ both are part of [Sanitism](https://sanitism.dev): built for autists to
 communicate their work, sanely.
 
 ```bash
-uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.0" \
+uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1" \
   document-sanity init my-paper --title "My paper"
 ```
 
@@ -59,7 +59,7 @@ Opinionated conventions are documented in detail under [`docs/`](./docs):
 One command, no clone and no git:
 
 ```bash
-uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.0" \
+uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1" \
   document-sanity init my-paper --title "My paper" --starter manuscript
 cd my-paper
 uv sync                                  # the pinned document-sanity; writes uv.lock (commit it)
@@ -116,7 +116,7 @@ requires-python = ">=3.10"
 # Pin a release tag (https://github.com/yakaboskic/document-sanity/releases),
 # not @main; to upgrade, change the tag and run `uv lock`.
 dependencies = [
-    "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.0",
+    "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1",
 ]
 
 [build-system]

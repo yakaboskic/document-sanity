@@ -1,6 +1,6 @@
 [project]
 name = "document-sanity"
-version = "0.2.0"
+version = "0.2.1"
 description = "Build PDF (LaTeX), interactive HTML, and Word (.docx) documents from a single Markdown source of truth — with variable substitution, figure management, and versioned builds."
 readme = "README.md"
 requires-python = ">=3.10"

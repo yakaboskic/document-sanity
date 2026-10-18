@@ -17,7 +17,7 @@ Ask the user (one message, all at once, with defaults):
 Then run the tool straight from its release, no install needed:
 
 ```bash
-uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.0" \
+uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1" \
   document-sanity init DIR --yes \
   --title "Title" --author "Name" --email "me@lab.org" --starter manuscript
 ```

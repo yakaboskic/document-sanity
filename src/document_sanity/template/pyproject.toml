@@ -14,7 +14,7 @@ license = {text = "MIT"}            # TEMPLATE: adjust or remove
 # newer release (https://github.com/yakaboskic/document-sanity/releases) and
 # run `uv lock && uv sync`.
 dependencies = [
-    "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.0",
+    "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1",
 ]
 
 [build-system]
