@@ -28,7 +28,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-from .manifest import Manifest, resolve_figure
+from .manifest import Manifest, expand_table_tokens, resolve_figure
 from .preview import parse_macros
 from .variable_processor import VariableProcessor
 from .md2html import md_to_html
@@ -1160,6 +1160,9 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
             print(f'  WARNING: section not found: {section_ref}')
             continue
         md_text = doc_path.read_text(encoding='utf-8')
+        # Expand {{tab:id}} on the raw markdown so md_to_html sees a native
+        # pipe table (as the LaTeX and Word paths do).
+        md_text = expand_table_tokens(md_text, manifest.tables, src_dir)
         md_text = _upgrade_figure_path(md_text)
         body = md_to_html(md_text, resolve, resolve_citation=citations.resolve, resolve_ref=resolve_ref)
         section_htmls.append(_render_section_html(body))
