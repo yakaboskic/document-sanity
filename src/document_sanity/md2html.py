@@ -48,6 +48,13 @@ _LATEX_FENCE_RE = re.compile(
     re.MULTILINE | re.DOTALL,
 )
 _CODE_FENCE_RE = re.compile(r'```(\w*)\s*\n(.*?)```', re.DOTALL)
+# One or more HTML comments with nothing else on their line(s). The tempered
+# dot stops a match from running past one comment's `-->` into the next.
+_COMMENT_LINE_RE = re.compile(
+    r'^(?:[ \t]*<!--(?:(?!-->).)*-->)+[ \t]*$',
+    re.MULTILINE | re.DOTALL,
+)
+_COMMENT_LINE = '\x00COMMENT\x00'
 
 
 # Variable token: {{name}}, {{name:fmt}}, or {{op: expr :fmt}}.
@@ -423,6 +430,24 @@ def _convert_table(block_lines: list[str],
     return '\n'.join(out)
 
 
+def _drop_comment_lines(lines: list[str]) -> list[str]:
+    """Remove the _COMMENT_LINE placeholders. A comment set apart by blank
+    lines (or opening the text) also takes the blank line after it, so the
+    spacing is what it would be without the comment."""
+    kept: list[str] = []
+    skip_blank = False
+    for line in lines:
+        if line == _COMMENT_LINE:
+            skip_blank = not kept or not kept[-1].strip()
+            continue
+        if skip_blank and not line.strip():
+            skip_blank = False
+            continue
+        skip_blank = False
+        kept.append(line)
+    return kept
+
+
 def md_to_html(md_content: str,
                resolve_variable: Callable[[str, Optional[str]], tuple],
                resolve_citation: Optional[Callable[[str], tuple]] = None,
@@ -463,12 +488,15 @@ def md_to_html(md_content: str,
         lambda m: f'<a id="{_escape(m.group(1))}"></a>',
         text,
     )
+    # A comment on its own line(s) goes with its lines: left as a blank line
+    # it would add a <br/> or split the paragraph around it.
+    text = _COMMENT_LINE_RE.sub(_COMMENT_LINE, text)
     text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
 
     # \FloatBarrier and the like — LaTeX-only, drop
     text = re.sub(r'\\FloatBarrier\b', '', text)
 
-    lines = text.split('\n')
+    lines = _drop_comment_lines(text.split('\n'))
     out: list[str] = []
     i = 0
     n = len(lines)

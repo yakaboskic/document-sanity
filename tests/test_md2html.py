@@ -40,3 +40,27 @@ def test_stray_bold_marker_does_not_open_a_span():
     html = md_to_html(md, _resolver)
     assert "<strong>real bold</strong>" in html
     assert "<strong> marker here" not in html
+
+
+# HTML comments vanish without a trace: a comment on its own line(s) must not
+# leave a blank line behind (each blank line is a <br/> in the viewer).
+
+def test_leading_comment_block_leaves_no_breaks():
+    md = "<!-- Cover sheet — no heading on purpose.\n     Second line. -->\n\n**Topic**: x"
+    assert md_to_html(md, _resolver) == "<p><strong>Topic</strong>: x</p>"
+
+
+def test_comment_between_paragraphs_keeps_the_usual_spacing():
+    plain = md_to_html("First.\n\nSecond.", _resolver)
+    assert md_to_html("First.\n\n<!-- note -->\n\nSecond.", _resolver) == plain
+
+
+def test_comment_line_inside_a_paragraph_does_not_split_it():
+    html = md_to_html("First line.\n<!-- note -->\nSecond line.", _resolver)
+    assert html == "<p>First line. Second line.</p>"
+
+
+def test_text_between_two_comments_on_a_line_is_kept():
+    html = md_to_html("<!-- a --> kept <!-- b -->", _resolver)
+    assert "kept" in html
+    assert "<!--" not in html
