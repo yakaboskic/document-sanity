@@ -121,8 +121,12 @@ def cmd_skills(args: argparse.Namespace) -> int:
     return 0
 
 
-def _project(args: argparse.Namespace, command: str):
-    """(root, chosen docs) for the project-wide commands, or an exit code."""
+def _project(args: argparse.Namespace, command: str, *, here_only: bool = True):
+    """(root, chosen docs) for the project-wide commands, or an exit code.
+
+    With no documents named, `here_only` narrows to the document the start
+    folder sits in (as `check` does); otherwise it's every document.
+    """
     from .project import find_project_root, select_documents
 
     start = Path(args.root)
@@ -136,7 +140,7 @@ def _project(args: argparse.Namespace, command: str):
         return None, 1
     wanted = list(args.docs or []) + list(getattr(args, "version", None) or [])
     try:
-        return (root, select_documents(root, wanted, start)), 0
+        return (root, select_documents(root, wanted, start if here_only else None)), 0
     except ValueError as e:
         print(f"  error: {e}", file=sys.stderr)
         return None, 1
@@ -188,11 +192,11 @@ def cmd_site(args: argparse.Namespace) -> int:
 
     from .site import SiteError, build_site
 
-    found, code = _project(args, "site")
+    found, code = _project(args, "site", here_only=False)
     if found is None:
         return code
     root, docs = found
-    out = Path(args.out) if Path(args.out).is_absolute() else Path.cwd() / args.out
+    out = Path(args.out) if Path(args.out).is_absolute() else root / args.out
     print(f"  building {len(docs)} document{'s' * (len(docs) != 1)}: {', '.join(docs)}")
     try:
         report = build_site(
@@ -206,7 +210,7 @@ def cmd_site(args: argparse.Namespace) -> int:
         _print_result(result, args.verbose)
     if report.failed:
         names = ", ".join(r.doc for r in report.failed)
-        print(f"\n  error: {names} didn't build; nothing was written to {args.out}/", file=sys.stderr)
+        print(f"\n  error: {names} didn't build; nothing was written to {os.path.relpath(out)}/", file=sys.stderr)
         return 1
     print(f"\n  → {os.path.relpath(out)}/index.html  ({len(report.published)} documents)")
     print(f"    serve it: python3 -m http.server --directory {os.path.relpath(out)} 8000")
@@ -219,7 +223,7 @@ def cmd_pages_init(args: argparse.Namespace) -> int:
 
     from . import pages
 
-    found, code = _project(args, "pages init")
+    found, code = _project(args, "pages init", here_only=False)
     if found is None:
         return code
     root, _ = found
@@ -941,7 +945,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Build every document and gather HTML, PDF and Word into site/ with an index page",
     )
     project_wide(site_p)
-    site_p.add_argument('--out', '-o', default='site', help='Output folder (default: site/)')
+    site_p.add_argument('--out', '-o', default='site',
+                        help='Output folder, relative to the project root (default: site/)')
     site_p.add_argument('--allow-notice', action='store_true',
                         help="Publish documents whose manifest sets metadata.notice "
                              "(only with the owner's explicit OK)")

@@ -137,6 +137,17 @@ def test_site_gathers_documents_with_an_index(project: Path, monkeypatch, capsys
     assert main(["site", "--no-pdf"]) == 0  # rebuilds over its own output
 
 
+def test_site_from_inside_a_document(project: Path, write, monkeypatch) -> None:
+    """Every document, and site/ at the root, wherever it's run from."""
+    write({"src/other/manifest.yaml": "metadata:\n  title: Other\nsections:\n  - docs/a.md\n",
+           "src/other/docs/a.md": "# A\n\nText.\n"})
+    monkeypatch.chdir(project / "src" / "paper" / "docs")
+    assert main(["site", "--no-pdf"]) == 0
+    assert (project / "site/paper/index.html").is_file()
+    assert (project / "site/other/index.html").is_file()
+    assert not (project / "src/paper/docs/site").exists()
+
+
 def test_site_refuses_a_notice_unless_allowed(project: Path) -> None:
     add_notice(project)
     with pytest.raises(SiteError, match="metadata.notice"):
