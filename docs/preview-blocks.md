@@ -13,13 +13,13 @@ is derived, hash-tagged, and regenerable.
 \begin{figure}[h!]
     \centering
     {{canva:3}}
-    \caption{Conceptual overview of the PIGEAN framework.}
-    \label{fig:pigean-method}
+    \caption{Conceptual overview of the framework.}
+    \label{fig:framework}
 \end{figure}
 ```
 
 <!-- document-sanity:preview:begin hash=a1b2c3d4 -->
-![Conceptual overview of the PIGEAN framework.](../figures/pigean-figure-2/pigean-figure-2.png)
+![Conceptual overview of the framework.](../figures/framework/framework.png)
 <!-- document-sanity:preview:end -->
 ```
 

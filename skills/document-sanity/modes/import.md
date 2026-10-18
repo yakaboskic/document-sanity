@@ -1,9 +1,9 @@
 # import: LaTeX → markdown
 
-Two situations: a multi-version LaTeX project in the pigean-manuscripts
-layout, or a plain `.tex` paper. For Word or PDF sources, use `onboard` mode.
+Two situations: a multi-version LaTeX project (one `main_<ver>.tex` per
+version), or a plain `.tex` paper. For Word or PDF sources, use `onboard` mode.
 
-## A. A pigean-style project
+## A. A multi-version project
 
 The source looks like:
 
@@ -17,7 +17,7 @@ old-paper/
 
 ```bash
 uv run document-sanity import --source ../old-paper --target . \
-  --manuscript indirect-support --version 03302026 --name indirect-support
+  --manuscript main-paper --version 03302026 --name main-paper
 ```
 
 It writes `src/<name>/` with `manifest.yaml` (title, abstract, keywords,
