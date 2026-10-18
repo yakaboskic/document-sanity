@@ -1,0 +1,57 @@
+% document-sanity article template
+% Insertion points are marked with %%DOCUMENT_SANITY: comments — the builder
+% substitutes title/authors/abstract/content/bibliography on build.
+%
+% Replace this file (or add siblings like `nature.tex`) for a different
+% journal style; `manifest.metadata.template: <name>` in manifest.yaml
+% selects which file is used.
+
+\documentclass[11pt, a4paper]{article}
+
+% T1 + lmodern: stop the default OT1 encoding from rendering '<' and '>'
+% as inverted Spanish punctuation (¡ ¿) in text mode. Also gives proper
+% accented-character glyphs and copyable PDF text.
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+
+% Unicode characters that pdflatex doesn't ship a default mapping for.
+% Add more as your prose drifts into other math symbols / arrows.
+\DeclareUnicodeCharacter{2265}{\ensuremath{\geq}}
+\DeclareUnicodeCharacter{2264}{\ensuremath{\leq}}
+\DeclareUnicodeCharacter{2260}{\ensuremath{\neq}}
+\DeclareUnicodeCharacter{2192}{\ensuremath{\rightarrow}}
+\DeclareUnicodeCharacter{2190}{\ensuremath{\leftarrow}}
+\DeclareUnicodeCharacter{00D7}{\ensuremath{\times}}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}    % flexible-width tables that auto-fit \textwidth
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{natbib}
+\bibliographystyle{plainnat}
+
+%% Example custom math macro — define your own here.
+%% `document-sanity preview` will expand \prob to \text{Pr} inside $...$ math
+%% so GitHub's KaTeX preview renders correctly without the custom command.
+\newcommand{\prob}{\text{Pr}}
+
+%%DOCUMENT_SANITY:PACKAGES
+
+\begin{document}
+
+%%DOCUMENT_SANITY:TITLE
+
+%%DOCUMENT_SANITY:ABSTRACT
+
+%%DOCUMENT_SANITY:CONTENT
+
+%%DOCUMENT_SANITY:BIBLIOGRAPHY
+
+\end{document}

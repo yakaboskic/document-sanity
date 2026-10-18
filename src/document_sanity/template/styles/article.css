@@ -1,0 +1,30 @@
+/* HTML override styles for document-sanity. Loaded after the built-in
+ * inline <style> block, so rules here win on cascade tie. Tweak to
+ * match your brand or journal style; the Word-side counterpart lives
+ * at styles/article.yaml.
+ */
+
+:root {
+  --brand-primary: #0F3D91;
+  --brand-secondary: #1E55B3;
+  --brand-muted: #64748b;
+}
+
+.paper-title,
+.content h1 {
+  color: var(--brand-primary);
+}
+
+.content h2 {
+  color: var(--brand-secondary);
+}
+
+.content code,
+.content pre {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: #882244;
+}
+
+.abstract {
+  border-left: 3px solid var(--brand-primary);
+}

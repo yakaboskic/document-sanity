@@ -1,38 +1,273 @@
 #!/usr/bin/env python3
 """
-CLI entry point for document-sanity v2.
+CLI entry point for document-sanity.
 
-Commands:
-  init           Initialize a new project
-  build          Build a version (src/ -> out/)
-  new-version    Create a new version from an existing one
+Every folder under src/ with a manifest.yaml is a document (`--version`
+names one; most commands default to the latest):
+
+  build          LaTeX tree (src/ -> out/<doc>/latex/), --compile for the PDF
+  html           Interactive HTML viewer
+  word           Word (.docx)
+  preview        Markdown-preview blocks next to ```latex blocks (--check: CI)
+  new-version    Copy a document into a new version folder
   import         Import an existing LaTeX project into src/ format
   convert        Convert a single markdown file to LaTeX (or vice versa)
   drawio         Sync/compose draw.io figures with re-importable source assets
+
+Starting, checking and publishing a project:
+
+  init           A new project from the template (no git needed)
+  skills         Install or refresh the agent skill
+  check          Build every target of every document; one command before sharing
+  site           Build every document and gather them into site/ with an index
+  pages init     Write the GitHub Pages workflow
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Optional
 
+from . import __version__
+
+
+def _ask(prompt: str, default: str) -> str:
+    try:
+        answer = input(f"  {prompt} [{default}]: ").strip()
+    except EOFError:
+        answer = ""
+    return answer or default
+
 
 def cmd_init(args: argparse.Namespace) -> int:
-    """Initialize a new project."""
-    from .init import init_project
+    """A new project from the template, in a folder with no .git."""
+    from . import init_project as ip
 
-    target = Path(args.target).resolve() if args.target else Path.cwd()
+    dest = Path(args.dir).expanduser()
+    starters = ",".join(args.starter) if args.starter else None
+    given = {
+        "slug": args.name, "title": args.title, "author": args.author,
+        "email": args.email, "description": args.description, "starters": starters,
+    }
+    interactive = not args.yes and sys.stdin.isatty()
     try:
-        init_project(
-            name=args.name,
-            target_dir=target,
-            template=args.template,
-            strategy=args.strategy,
-        )
-        return 0
-    except Exception as e:
-        print(f"  Error: {e}", file=sys.stderr)
+        source = None
+        if args.in_place and args.source:
+            raise ip.InitError("--in-place initializes the template copy in DIR; drop --from")
+        if args.source:
+            owner, repo, ref = ip.parse_gh_spec(args.source)
+            print(f"  downloading {owner}/{repo}{'@' + ref if ref else ''} …")
+            source = ip.fetch_github(owner, repo, ref)
+        if interactive:
+            print("  Setting up a new project. Defaults in [brackets]; Enter accepts.\n")
+        answers = ip.gather_answers(dest, given, ask=_ask if interactive else None)
+        if args.in_place:
+            result = ip.init_in_place(dest, answers, skills=not args.no_skills, force=args.force)
+        else:
+            result = ip.create_project(
+                dest, answers, source=source, skills=not args.no_skills,
+                force=args.force, git=args.git,
+            )
+    except ip.InitError as e:
+        print(f"  error: {e}", file=sys.stderr)
         return 1
+
+    a = result.answers
+    print(f"\n  → {result.dest}  ({a.slug}, from {result.source})")
+    counts = [f"{len(result.written)} files written"]
+    if result.overwritten:
+        counts.append(f"{len(result.overwritten)} {'rewritten' if args.in_place else 'overwritten'}")
+    if result.removed:
+        counts.append("removed " + ", ".join(result.removed))
+    print("    " + "; ".join(counts))
+    print("    documents: " + ", ".join(f"src/{d}/" for d in result.documents))
+    if not args.no_skills:
+        print(
+            f"    agent skill: {ip.SKILL_DIRS[0]}/{ip.SKILL_NAME}/ (Claude Code: "
+            f"/{ip.SKILL_NAME}) and {ip.SKILL_DIRS[1]}/{ip.SKILL_NAME}/"
+        )
+    if result.git:
+        print(f"    git: {result.git}")
+    first = result.documents[0] if result.documents else "manuscript"
+    print("\n  next:")
+    if result.dest.resolve() != Path.cwd().resolve():
+        print(f"    cd {result.dest}")
+    print(ip.commented([
+        ("uv sync", "document-sanity, pinned"),
+        (f"make html VERSION={first}", f"→ out/{first}/html/index.html"),
+        (f"make word VERSION={first}", f"→ out/{first}/word/main.docx"),
+        (f"make pdf VERSION={first}", "needs TeX (pdflatex, bibtex)"),
+        ("uv run document-sanity check", "every target, before you share"),
+    ], indent="    "))
+    return 0
+
+
+def cmd_skills(args: argparse.Namespace) -> int:
+    """Install (or refresh) the agent skill in an existing project."""
+    from . import init_project as ip
+    from .project import find_project_root
+
+    root = find_project_root(Path(args.root)) or Path(args.root).resolve()
+    try:
+        plan = ip.install_skill(root, force=args.force)
+    except ip.InitError as e:
+        print(f"  error: {e}", file=sys.stderr)
+        return 1
+    changed = len(plan.create) + len(plan.conflicts)
+    for base in ip.SKILL_DIRS:
+        print(f"  → {base}/{ip.SKILL_NAME}/")
+    print(f"    v{__version__}: {changed} file(s) written, {len(plan.unchanged)} already current")
+    return 0
+
+
+def _project(args: argparse.Namespace, command: str, *, here_only: bool = True):
+    """(root, chosen docs) for the project-wide commands, or an exit code.
+
+    With no documents named, `here_only` narrows to the document the start
+    folder sits in (as `check` does); otherwise it's every document.
+    """
+    from .project import find_project_root, select_documents
+
+    start = Path(args.root)
+    root = find_project_root(start)
+    if root is None:
+        print(
+            f"  error: `{command}` works in a project — a folder whose src/ holds "
+            "<doc>/manifest.yaml (see `document-sanity init`)",
+            file=sys.stderr,
+        )
+        return None, 1
+    wanted = list(args.docs or []) + list(getattr(args, "version", None) or [])
+    try:
+        return (root, select_documents(root, wanted, start if here_only else None)), 0
+    except ValueError as e:
+        print(f"  error: {e}", file=sys.stderr)
+        return None, 1
+
+
+_MARKS = {"ok": "✓", "error": "✗", "warn": "!", "skip": "-"}
+
+
+def _print_result(result, verbose: bool) -> None:
+    print(f"\n  {result.doc}")
+    for step in result.steps:
+        print(f"    {_MARKS[step.status]} {step.name:<8} {step.detail}")
+        if step.status in ("error", "warn") or verbose:
+            for note in step.notes[:20]:
+                print(f"        {note}")
+            if len(step.notes) > 20:
+                print(f"        … and {len(step.notes) - 20} more")
+
+
+def cmd_check(args: argparse.Namespace) -> int:
+    """Build every target of the chosen documents and run preview --check."""
+    from .check import build_document
+
+    found, code = _project(args, "check")
+    if found is None:
+        return code
+    root, docs = found
+    print(f"  checking {len(docs)} document{'s' * (len(docs) != 1)} in {root}: {', '.join(docs)}")
+    errors = warnings = 0
+    for doc in docs:
+        result = build_document(
+            root, doc, pdf=not args.no_pdf, compiler=args.compiler, verbose=args.verbose,
+        )
+        _print_result(result, args.verbose)
+        errors += len(result.errors)
+        warnings += len(result.warnings)
+    print()
+    if errors:
+        print(f"  {errors} error{'s' * (errors != 1)}, {warnings} warning{'s' * (warnings != 1)}")
+        return 1
+    print("  ok: every target builds" + (" (see warnings)" if warnings else "")
+          + f"; outputs in {os.path.relpath(root / 'out')}/")
+    return 0
+
+
+def cmd_site(args: argparse.Namespace) -> int:
+    """Build the chosen documents and gather them into a static site."""
+    import yaml
+
+    from .site import SiteError, build_site
+
+    found, code = _project(args, "site", here_only=False)
+    if found is None:
+        return code
+    root, docs = found
+    out = Path(args.out) if Path(args.out).is_absolute() else root / args.out
+    print(f"  building {len(docs)} document{'s' * (len(docs) != 1)}: {', '.join(docs)}")
+    try:
+        report = build_site(
+            root, docs, out, pdf=not args.no_pdf, allow_notice=args.allow_notice,
+            compiler=args.compiler, verbose=args.verbose,
+        )
+    except (SiteError, yaml.YAMLError, OSError, ValueError) as e:
+        print(f"  error: {e}", file=sys.stderr)
+        return 1
+    for result in report.results:
+        _print_result(result, args.verbose)
+    if report.failed:
+        names = ", ".join(r.doc for r in report.failed)
+        print(f"\n  error: {names} didn't build; nothing was written to {os.path.relpath(out)}/", file=sys.stderr)
+        return 1
+    print(f"\n  → {os.path.relpath(out)}/index.html  ({len(report.published)} documents)")
+    print(f"    serve it: python3 -m http.server --directory {os.path.relpath(out)} 8000")
+    return 0
+
+
+def cmd_pages_init(args: argparse.Namespace) -> int:
+    """Write the GitHub Pages workflow into a project, once the user agrees it's public."""
+    import yaml
+
+    from . import pages
+
+    found, code = _project(args, "pages init", here_only=False)
+    if found is None:
+        return code
+    root, _ = found
+    warning = (
+        "  A GitHub Pages site is PUBLIC: anyone with the link can read it, even when\n"
+        "  the repository is private. Every published document goes up as an HTML\n"
+        "  viewer (numbers and their provenance included), a PDF and a Word file."
+    )
+    if not args.yes:
+        if not sys.stdin.isatty():
+            print(warning, file=sys.stderr)
+            print(
+                "\n  error: confirm with the person who owns these documents, then rerun "
+                "with --yes", file=sys.stderr,
+            )
+            return 1
+        print(warning)
+        if _ask("Publish them publicly? (yes/no)", "no").lower() not in ("y", "yes"):
+            print("  nothing written")
+            return 1
+    try:
+        report = pages.pages_init(
+            root, branch=args.branch, only_repo=args.only_repo, docs=args.docs or None,
+            pdf=not args.no_pdf, allow_notice=args.allow_notice, force=args.force,
+        )
+    except (pages.PagesError, yaml.YAMLError, OSError) as e:
+        print(f"  error: {e}", file=sys.stderr)
+        return 1
+
+    print(f"  → {os.path.relpath(report.path)}")
+    print(f"    publishes: {', '.join(report.docs) if args.docs else 'every document under src/'}"
+          + (" (HTML + Word; no PDF)" if args.no_pdf else " (HTML, PDF, Word)"))
+    for note in report.notes:
+        print(f"  ! {note}")
+    remote = pages.github_remote(root)
+    slug = "/".join(remote) if remote else "OWNER/REPO"
+    url = f"https://{remote[0]}.github.io/{remote[1]}/" if remote else "https://OWNER.github.io/REPO/"
+    print("\n  next:")
+    print("    0. try it: uv run document-sanity site   (→ site/, what the workflow uploads)")
+    print("    1. Settings → Pages → Source: GitHub Actions, or")
+    print(f"       gh api -X POST repos/{slug}/pages -f build_type=workflow   (PUT if Pages is already on)")
+    print(f"    2. commit {pages.WORKFLOW_PATH} and uv.lock, and push to {args.branch}")
+    print(f"    3. the site appears at {url}")
+    return 0
 
 
 def cmd_build(args: argparse.Namespace) -> int:
@@ -522,20 +757,44 @@ def cmd_drawio(args: argparse.Namespace) -> int:
     return 1
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="document-sanity",
-        description="Build LaTeX documents from Markdown source with variable substitution, provenance tracking, and versioned builds.",
+        description="Build PDF (LaTeX), an interactive HTML viewer and Word from Markdown "
+                    "and one manifest.yaml per document, with variables that carry provenance.",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # --- init ---
-    init_p = subparsers.add_parser("init", help="Initialize a new project")
-    init_p.add_argument('name', help='Project name')
-    init_p.add_argument('--target', '-t', help='Parent directory (default: cwd)')
-    init_p.add_argument('--template', default='article', help='Starting template (default: article)')
-    init_p.add_argument('--strategy', '-s', default='both', choices=['date', 'fun', 'both'],
-                        help='Version naming strategy (default: both)')
+    init_p = subparsers.add_parser(
+        "init",
+        help="Start a new project from the template in DIR (no git needed)",
+        description=(
+            "Copy the document-sanity-template snapshot that ships with this release "
+            "into DIR, name it, and install the agent skill. DIR may be new, empty, or "
+            "an existing folder to knit into: existing files are never overwritten "
+            "without --force, and a folder that already has documents under src/ is "
+            "refused. Unset answers are prompted for (or defaulted with --yes)."
+        ),
+    )
+    init_p.add_argument('dir', nargs='?', default='.', metavar='DIR', help='Default: the current folder')
+    init_p.add_argument('--from', dest='source', default=None, metavar='gh:OWNER/REPO[@REF]',
+                        help="Start from a GitHub repo (e.g. your lab's fork of the template) instead")
+    init_p.add_argument('--name', default=None, help="Project name (kebab-case; default: DIR's name)")
+    init_p.add_argument('--title', default=None, help='Document title (every starter you keep)')
+    init_p.add_argument('--author', default=None, help='Author name (default: git config user.name)')
+    init_p.add_argument('--email', default=None, help='Author email (default: git config user.email)')
+    init_p.add_argument('--description', default=None, help='One-line description')
+    init_p.add_argument('--starter', action='append', default=None, metavar='NAME',
+                        help="Starter documents to keep: manuscript, proposal, or both "
+                             "(default: both; repeat or comma-separate)")
+    init_p.add_argument('-y', '--yes', action='store_true', help="Don't prompt; use defaults")
+    init_p.add_argument('--git', action='store_true', help='git init and make a first commit')
+    init_p.add_argument('--force', action='store_true', help='Overwrite files that already exist')
+    init_p.add_argument('--no-skills', action='store_true', help="Don't install the agent skill")
+    init_p.add_argument('--in-place', action='store_true',
+                        help="Initialize a template copy where it stands (what the template's init.py runs)")
 
     # --- build ---
     build_p = subparsers.add_parser("build", help="Build a version (src/ -> out/)")
@@ -655,31 +914,104 @@ def main() -> None:
     status_p.add_argument('--root', '-r', default='.', help='Project root directory')
     status_p.add_argument('--version', '-V', help='Version (default: auto-detect latest)')
 
-    args = parser.parse_args()
+    # --- skills ---
+    skills_p = subparsers.add_parser(
+        "skills", help="Install or refresh the agent skill in .claude/skills/ and .agents/skills/")
+    skills_p.add_argument('--root', '-r', default='.', help='Project root (default: found from cwd)')
+    skills_p.add_argument('--force', action='store_true', help="Overwrite a skill you've edited")
+
+    # --- check / site: shared options ---
+    docs_help = ("Documents (folders under src/). Default: all of them, or the one "
+                 "you're inside.")
+
+    def project_wide(p: argparse.ArgumentParser) -> None:
+        p.add_argument('docs', nargs='*', metavar='DOC', help=docs_help)
+        p.add_argument('--version', '-V', action='append', default=None, metavar='DOC',
+                       help='Same as DOC (repeatable), for symmetry with the other commands')
+        p.add_argument('--root', '-r', default='.', help='Where to start (the project root is found by walking up)')
+        p.add_argument('--no-pdf', action='store_true', help='Skip the PDF (no TeX needed); the LaTeX tree still builds')
+        p.add_argument('--compiler', default='pdflatex',
+                       choices=['pdflatex', 'xelatex', 'lualatex', 'latexmk'], help='LaTeX compiler')
+        p.add_argument('--verbose', '-v', action='store_true', help="Show every builder's output")
+
+    check_p = subparsers.add_parser(
+        "check",
+        help="Build every target (PDF, HTML, Word) and run preview --check: one command before sharing",
+    )
+    project_wide(check_p)
+
+    site_p = subparsers.add_parser(
+        "site",
+        help="Build every document and gather HTML, PDF and Word into site/ with an index page",
+    )
+    project_wide(site_p)
+    site_p.add_argument('--out', '-o', default='site',
+                        help='Output folder, relative to the project root (default: site/)')
+    site_p.add_argument('--allow-notice', action='store_true',
+                        help="Publish documents whose manifest sets metadata.notice "
+                             "(only with the owner's explicit OK)")
+
+    # --- pages ---
+    pages_p = subparsers.add_parser("pages", help="Publish on GitHub Pages")
+    pages_sub = pages_p.add_subparsers(dest="pages_command", required=True)
+    pages_init_p = pages_sub.add_parser(
+        "init",
+        help="Write .github/workflows/pages.yml (builds every document's HTML, PDF and Word)",
+        description=(
+            "Write the GitHub Pages workflow. A Pages site is public even from a private "
+            "repository, so this asks first (--yes once the owner has agreed), and refuses "
+            "documents whose manifest sets metadata.notice unless --allow-notice."
+        ),
+    )
+    pages_init_p.add_argument('docs', nargs='*', metavar='DOC',
+                              help='Publish only these documents (default: every document under src/)')
+    pages_init_p.add_argument('--root', '-r', default='.', help='Where to start (the project root is found by walking up)')
+    pages_init_p.add_argument('--yes', '-y', action='store_true',
+                              help='The owner has agreed the site is public; skip the prompt')
+    pages_init_p.add_argument('--no-pdf', action='store_true',
+                              help='Publish HTML and Word only; the runner skips installing TeX')
+    pages_init_p.add_argument('--allow-notice', action='store_true',
+                              help="Publish documents whose manifest sets metadata.notice "
+                                   "(only with the owner's explicit OK)")
+    pages_init_p.add_argument('--branch', default='main', help='Deploy on pushes to this branch')
+    pages_init_p.add_argument('--only-repo', default=None, metavar='OWNER/NAME',
+                              help='Deploy only from this repository; forks and template copies skip the job')
+    pages_init_p.add_argument('--force', action='store_true', help='Overwrite an existing workflow')
+
+    return parser
+
+
+HANDLERS = {
+    'init': cmd_init,
+    'skills': cmd_skills,
+    'build': cmd_build,
+    'new-version': cmd_new_version,
+    'import': cmd_import,
+    'preview': cmd_preview,
+    'html': cmd_html,
+    'word': cmd_word,
+    'convert': cmd_convert,
+    'drawio': cmd_drawio,
+    'check': cmd_check,
+    'site': cmd_site,
+    'pages': cmd_pages_init,
+}
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
 
     if args.command is None:
         parser.print_help()
-        sys.exit(0)
+        return 0
 
-    handlers = {
-        'init': cmd_init,
-        'build': cmd_build,
-        'new-version': cmd_new_version,
-        'import': cmd_import,
-        'preview': cmd_preview,
-        'html': cmd_html,
-        'word': cmd_word,
-        'convert': cmd_convert,
-        'drawio': cmd_drawio,
-    }
-
-    handler = handlers.get(args.command)
-    if handler:
-        sys.exit(handler(args))
-    else:
+    handler = HANDLERS.get(args.command)
+    if handler is None:
         parser.print_help()
-        sys.exit(1)
+        return 1
+    return handler(args)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

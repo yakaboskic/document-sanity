@@ -1,0 +1,99 @@
+# Proposal-style manifest. Differs from the manuscript version in two
+# ways:
+#   1. metadata.render: false — no auto-rendered title/authors/abstract.
+#      The first section (1.0 Cover Sheet) carries the topic / contract /
+#      phase metadata inline so reviewers see it at the top.
+#   2. template: proposal — loads templates/proposal.tex which sets
+#      secnumdepth=-1, suppressing LaTeX's own section numbering so the
+#      hand-written "1.0 Introduction" / "2.1 Aims" headings render
+#      cleanly without the auto-counter doubling them.
+#
+# The Word side reuses templates/article.docx (and styles/article.yaml,
+# styles/article.css) — proposals share visual chrome with the
+# manuscript by default. Override here if you want a separate
+# proposal.docx / styles.
+
+metadata:
+  # TEMPLATE: `python init.py` (or `document-sanity init`) sets the title
+  # and authors. The affiliations, abstract and keywords are placeholders
+  # to edit by hand.
+  title: "Lunar Regolith Sintering for In-Situ Habitat Printing"
+  authors:
+    - name: "Principal Investigator"
+      email: "pi@example.org"
+      affiliations: [1]
+    - name: "Co-Investigator"
+      email: "coi@example.org"
+      affiliations: [1]
+  affiliations:
+    1:
+      department: "Department of Materials Engineering"
+      institution: "Example Institute of Selenology"
+  keywords: [proposal, isru, lunar-construction, additive-manufacturing]
+  template: proposal           # → templates/proposal.tex
+  word_template: article       # → templates/article.docx
+  word_styles: article         # → styles/article.yaml
+  html_styles: article         # → styles/article.css
+  render: false                # skip auto title/abstract — proposal owns
+                               # its own front matter (see 0_cover.md)
+
+# Hand-numbered sections matching common SBIR/NIH/NSF proposal structure.
+# Files are prefixed with their section number so the on-disk order
+# tracks the rendered order — easier to navigate in any editor.
+sections:
+  - docs/0_cover.md
+  - docs/1_introduction.md
+  - docs/2_aims.md
+  - docs/3_approach.md
+  - docs/4_plan.md
+  - docs/5_impact.md
+  - _bibliography
+
+variables:
+  PHASE_I_BUDGET:
+    value: 250000
+    provenance:
+      description: Phase I award amount.
+      updated: "2026-02-15"
+
+  PHASE_II_BUDGET:
+    value: 1500000
+    provenance:
+      description: Phase II requested budget over 12 months.
+      updated: "2026-04-15"
+
+  COMPRESSIVE_STRENGTH_MPA:
+    value: 27.4
+    provenance:
+      description: >
+        Mean compressive strength of sintered JSC-1A regolith simulant
+        coupons under our optimized 1380 °C profile (n=12 coupons).
+      source: data/coupon_compression_results.csv
+      command: python scripts/analyze_coupons.py --out data/coupon_compression_results.csv
+      updated: "2026-02-10"
+
+  PRINT_RESOLUTION_UM:
+    value: 220
+    provenance:
+      description: Layer-height resolution achieved by the prototype gantry.
+      updated: "2026-02-10"
+
+figures:
+  architecture:
+    width: "\\textwidth"
+    # Placeholder system diagram. Replace with your own, drop into
+    # figures/architecture/architecture.{png,pdf,svg}.
+
+tables:
+  milestones:
+    source: tables/milestones.csv
+    format: csv
+    provenance:
+      description: Phase II milestone schedule, six bimonthly milestones over 12 months.
+      updated: "2026-04-15"
+  risk_register:
+    source: tables/risk_register.tsv
+    format: tsv
+    provenance:
+      description: Top-five technical risks with mitigation plans.
+      updated: "2026-04-15"

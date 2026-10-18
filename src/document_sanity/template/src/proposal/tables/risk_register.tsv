@@ -1,0 +1,6 @@
+Risk	Likelihood	Impact	Mitigation	Owner
+Coupon strength below 25 MPa in vacuum	Medium	High	Stepped profile (Aim 1); binder-jet fallback path	PI
+Recoater binding on lunar fines	High	Medium	Blade redesign + purge knife (Aim 2)	Co-I
+QC false-positive rate exceeds 2%	Low	Low	Larger training set, ensemble classifier	Consultant
+Gantry bushing failure under cycling	Medium	Medium	Graphite bushings; quarterly inspection	Co-I
+Schedule slip on M3 integration	Medium	Medium	M3 has float; M4 demonstration scope flexible	PI
