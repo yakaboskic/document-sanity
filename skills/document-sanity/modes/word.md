@@ -5,14 +5,19 @@ template contributes headers, footers, theme, page layout and named styles;
 `docs/*.md` contribute the body.
 
 ```bash
-make word VERSION=<doc>      # word + the layout pass → out/<doc>/word/main.docx
+make word VERSION=<doc>      # → out/<doc>/word/main.docx
 ```
 
-`make word` (and `check`, and `site`) also run `scripts/finalize_word_layout.py`
-when the project has it: table rows kept together with a repeating header,
-headings kept with the next paragraph, figures kept with their captions, and
-equations sized to the surrounding text. Change that script, not the output.
-`uv run document-sanity word -V <doc>` alone skips it.
+Every Word build (`word`, so `make word`, `check` and `site` too) ends with
+a layout pass: table rows kept together with a repeating header, headings
+kept with the next paragraph, figures kept with their captions, and
+equations sized to the surrounding text. `--no-layout` skips it. Don't
+hand-edit the .docx to fix pagination; rebuild.
+
+A project made from an older template may still have
+`scripts/finalize_word_layout.py`, run by its `make word`. The build does
+that pass itself now, so the script changes nothing: with the user's OK,
+delete it and its line in the Makefile's `word` target.
 
 ## Which template
 

@@ -11,6 +11,9 @@ Pipeline:
   src/<version>/figures/*        --(embedded into the docx zip)
   src/<version>/references.bib   --(rendered as References section when cited)
 
+then the layout pass (docx_layout.py) over the saved .docx: tables, headings
+and figures paginate together and equations take the body font size.
+
 Shares these pieces with the LaTeX pipeline:
   - manifest.py: metadata, sections, variables, figures, tables
   - variable_processor.py: {{VAR}} substitution (with target="word")
@@ -33,6 +36,7 @@ from .bib import (
 )
 from .docx_content import ContentBuilder, TextStyle
 from .docx_extract import extract_styles
+from .docx_layout import LayoutStats, layout_docx
 from .docx_styles import default_styles, load_styles
 from .docx_template import TemplateDocument, TemplateDocumentConfig
 from .docx_xml import RichText
@@ -53,12 +57,15 @@ class WordBuilder:
         placeholder: str = "XXXX",
         strict: bool = False,
         verbose: bool = False,
+        layout: bool = True,
     ):
         self.root_dir = root_dir
         self.version = version
         self.placeholder = placeholder
         self.strict = strict
         self.verbose = verbose
+        self.layout = layout
+        self.layout_stats: Optional[LayoutStats] = None
 
         self.src_dir = root_dir / "src" / version
         self.manifest_path = self.src_dir / "manifest.yaml"
@@ -330,8 +337,13 @@ class WordBuilder:
         print("\n  Rendering sections...")
         self._render_sections(doc)
 
-        # Save
+        # Save, then paginate the saved document.
         doc.save(self.out_docx)
+        if self.layout:
+            self.layout_stats = layout_docx(self.out_docx, styles["fontSizes"]["body"])
+            print(f"  Word layout: {self.layout_stats}")
+        else:
+            print("  Word layout: skipped (--no-layout)")
 
         # Also emit the resolved styles dict alongside as a source of truth
         # the user can copy to styles/<name>.yaml, edit, and feed back via

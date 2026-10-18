@@ -18,7 +18,7 @@ ROOT/
 │   └── references.bib
 ├── templates/                 # SHARED: <name>.tex (PDF), <name>.docx (Word), logo, watermark
 ├── styles/                    # SHARED: <name>.yaml (Word styles), <name>.css (HTML)
-├── scripts/                   # e.g. finalize_word_layout.py (the Word pagination pass)
+├── scripts/                   # the project's own helper scripts, if any
 ├── out/<doc>/                 # build output: latex/, pdf/, html/, word/ (generated)
 └── site/                      # `document-sanity site` output (generated)
 ```
@@ -78,7 +78,7 @@ table when they disagree.
 | `preview -V DOC [--check]` | refresh (or just check) the preview blocks in `src/DOC/docs/` |
 | `build -V DOC [--compile]` | LaTeX tree → `out/DOC/latex/`; `--compile` → `out/DOC/pdf/main.pdf` (needs TeX) |
 | `html -V DOC` | interactive viewer → `out/DOC/html/index.html` |
-| `word -V DOC` | Word → `out/DOC/word/main.docx` (`make word` adds the layout pass) |
+| `word -V DOC` | Word → `out/DOC/word/main.docx`, laid out (`--no-layout` skips that) |
 | `word --extract-styles …` | dump a `.docx`'s styles to edit (see `word` mode) |
 | `check [DOC…] [--no-pdf]` | every target + preview check + unresolved references |
 | `site [DOC…] [--no-pdf]` | every document → `site/` with an index page |

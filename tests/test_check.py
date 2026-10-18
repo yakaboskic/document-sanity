@@ -103,9 +103,20 @@ def test_template_builds_html_and_word(template_project: Path) -> None:
         result = check.build_document(template_project, doc, pdf=False)
         assert not result.errors, [(s.name, s.detail, s.notes) for s in result.errors]
         word = result.step("word")
-        assert word.status == "ok" and check.WORD_LAYOUT_PASS in word.detail
+        assert word.status == "ok" and word.notes[0].startswith("layout: ")
         assert (template_project / f"out/{doc}/word/main.docx").is_file()
         assert (template_project / f"out/{doc}/html/index.html").is_file()
+
+
+def test_an_old_layout_script_is_not_run(project: Path, write) -> None:
+    """The builder lays the .docx out itself; a project's old
+    scripts/finalize_word_layout.py is left alone, with a note to delete it."""
+    write({check.LEGACY_LAYOUT_SCRIPT: "raise SystemExit('should not run')\n"})
+    (project / "templates").mkdir()
+    shutil.copy(ip._PKG / "template/templates/article.docx", project / "templates")
+    word = check.build_document(project, "paper", pdf=False).step("word")
+    assert word.status == "ok", word.notes
+    assert any(check.LEGACY_LAYOUT_SCRIPT in note and "no longer needed" in note for note in word.notes)
 
 
 @needs_tex

@@ -10,8 +10,9 @@ For each document under `src/` it runs, in order:
 - **refs**: every `{{VARIABLE}}` is defined, every `\\cite{key}` is in
   `references.bib` and every `\\ref{label}` has a `\\label`;
 - **html**: the interactive viewer;
-- **word**: the .docx, plus the project's Word layout pass
-  (`scripts/finalize_word_layout.py`, as `make word` runs it) when there is one.
+- **word**: the .docx, laid out (the builder's own pagination pass). A
+  project's old `scripts/finalize_word_layout.py` isn't run: the builder does
+  what it did.
 
 The builders' own chatter is captured and shown only for a failing step (or
 with `--verbose`). `build_document` is also what `document-sanity site` uses.
@@ -23,13 +24,13 @@ import contextlib
 import io
 import re
 import shutil
-import subprocess
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-WORD_LAYOUT_PASS = "scripts/finalize_word_layout.py"
+# Projects made before the builder did its own layout pass ship this script
+# (and `make word` runs it). It's idempotent, so it's harmless; check says so.
+LEGACY_LAYOUT_SCRIPT = "scripts/finalize_word_layout.py"
 STEPS = ("preview", "pdf", "refs", "html", "word")
 BUILD_STEPS = ("pdf", "html", "word")
 
@@ -297,21 +298,11 @@ def build_document(
         why = f"{type(exc).__name__}: {exc}" if exc else "the Word build failed"
         result.steps.append(Step("word", "error", why, _tail(text)))
         return result
-    layout = root / WORD_LAYOUT_PASS
-    if layout.is_file():
-        proc = subprocess.run(
-            [sys.executable, str(layout), "--root", str(root), "--version", doc],
-            capture_output=True, text=True, cwd=root,
+    notes = [f"layout: {word.layout_stats}"]
+    if (root / LEGACY_LAYOUT_SCRIPT).is_file():
+        notes.append(
+            f"{LEGACY_LAYOUT_SCRIPT} is no longer needed (`document-sanity word` does its "
+            "layout pass): delete it, and its line in the Makefile's `word` target"
         )
-        if verbose:
-            print(proc.stdout, end="")
-        if proc.returncode != 0:
-            result.steps.append(Step(
-                "word", "error", f"{WORD_LAYOUT_PASS} failed (exit {proc.returncode})",
-                _tail(proc.stdout + proc.stderr), output=docx,
-            ))
-            return result
-        result.steps.append(Step("word", "ok", f"{_rel(root, docx)} (+ {WORD_LAYOUT_PASS})", output=docx))
-    else:
-        result.steps.append(Step("word", "ok", _rel(root, docx), output=docx))
+    result.steps.append(Step("word", "ok", _rel(root, docx), notes, output=docx))
     return result
