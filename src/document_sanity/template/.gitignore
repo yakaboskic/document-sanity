@@ -1,0 +1,36 @@
+# document-sanity output — regenerated from src/
+out/
+site/
+
+# LaTeX intermediates (in case of direct pdflatex runs outside the builder)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.synctex.gz
+*.dvi
+*.run.xml
+*.bcf
+*.idx
+*.ilg
+*.ind
+
+# Python / venv
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+.python-version
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+.cursor/

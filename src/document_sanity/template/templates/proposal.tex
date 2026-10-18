@@ -1,0 +1,62 @@
+% document-sanity proposal template
+% Sibling of article.tex tuned for proposal-style documents (SBIR/STTR,
+% NIH/NSF, internal whitepapers, etc.) where:
+%   - the author hand-numbers sections like "1.0 Introduction",
+%     "2.1 Aims", and we don't want LaTeX to add its own counter on top
+%   - there's typically no auto-rendered title block (manifest sets
+%     metadata.render: false)
+%   - bib is conventionally inline footnoted or in a References section
+%
+% Selected by `manifest.metadata.template: proposal`. Word side reuses
+% the article.docx unless a proposal.docx is added.
+
+\documentclass[11pt, a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+
+% Unicode characters that pdflatex doesn't ship a default mapping for.
+% Add more as your prose drifts into other math symbols / arrows.
+\DeclareUnicodeCharacter{2265}{\ensuremath{\geq}}
+\DeclareUnicodeCharacter{2264}{\ensuremath{\leq}}
+\DeclareUnicodeCharacter{2260}{\ensuremath{\neq}}
+\DeclareUnicodeCharacter{2192}{\ensuremath{\rightarrow}}
+\DeclareUnicodeCharacter{2190}{\ensuremath{\leftarrow}}
+\DeclareUnicodeCharacter{00D7}{\ensuremath{\times}}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}    % flexible-width tables that auto-fit \textwidth
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage[section]{placeins}  % floats stay inside their section (tables can't drift past References)
+\usepackage{subcaption}
+\usepackage{natbib}
+\bibliographystyle{plainnat}
+
+% Suppress section auto-numbering. Authors hand-write numbers like
+% "1.0 Introduction" / "2.1 Aims" in markdown headings; LaTeX would
+% otherwise prefix its own counter ("1 1.0 Introduction") and produce
+% a double-numbered mess.
+\setcounter{secnumdepth}{-1}
+
+\newcommand{\prob}{\text{Pr}}
+
+%%DOCUMENT_SANITY:PACKAGES
+
+\begin{document}
+
+%%DOCUMENT_SANITY:TITLE
+
+%%DOCUMENT_SANITY:ABSTRACT
+
+%%DOCUMENT_SANITY:CONTENT
+
+%%DOCUMENT_SANITY:BIBLIOGRAPHY
+
+\end{document}

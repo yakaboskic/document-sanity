@@ -1,0 +1,99 @@
+colors:
+  primary: 0F3D91
+  secondary: C0504D
+  accent: 9BBB59
+  text: 1F2937
+  textLight: '666666'
+  textMuted: '999999'
+  background: FFFFFF
+  backgroundAlt: F2F2F2
+  backgroundMuted: F5F5F5
+  border: D9D9D9
+  borderLight: E5E5E5
+  success: 28A745
+  warning: FFC107
+  warningBg: FFF3CD
+  error: DC3545
+  info: 17A2B8
+  heading1: 0F3D91
+  heading2: 1E55B3
+  heading3: '333333'
+fonts:
+  heading: Calibri
+  body: Calibri
+  mono: Consolas
+fontSizes:
+  title: 52
+  h1: 36
+  h2: 28
+  h3: 24
+  body: 22
+  small: 20
+  caption: 18
+  label: 22
+spacing:
+  paragraph:
+    after: 120
+    afterSmall: 120
+    afterLarge: 400
+  heading:
+    h1:
+      before: 360
+      after: 120
+    h2:
+      before: 240
+      after: 80
+    h3:
+      before: 200
+      after: 120
+  lineHeight: 276
+  lineHeightTight: 240
+listStyles:
+  bullet:
+    font: Calibri
+    size: 22
+    color: 1F2937
+  numbered:
+    font: Calibri
+    size: 22
+    color: 1F2937
+tableStyles:
+  default:
+    headerBackground: 0F3D91
+    headerTextColor: FFFFFF
+    headerFont: Calibri
+    headerSize: 22
+    headerBold: true
+    bodyTextColor: 1F2937
+    bodyFont: Calibri
+    bodySize: 22
+    rowEven: FFFFFF
+    rowOdd: F2F2F2
+    border: D9D9D9
+    borderWidth: 4
+  subtle:
+    headerBackground: F2F2F2
+    headerTextColor: 1F2937
+    headerFont: Calibri
+    headerSize: 22
+    headerBold: true
+    bodyTextColor: 1F2937
+    bodyFont: Calibri
+    bodySize: 22
+    rowEven: FFFFFF
+    rowOdd: FFFFFF
+    border: E5E5E5
+    borderWidth: 4
+noteStyles:
+  warning:
+    background: FFF3CD
+    borderColor: FFC107
+  info:
+    background: E7F3FE
+    borderColor: 17A2B8
+  success:
+    background: D4EDDA
+    borderColor: 28A745
+  error:
+    background: F8D7DA
+    borderColor: DC3545

@@ -1,0 +1,31 @@
+[project]
+# TEMPLATE: `python init.py` (or `document-sanity init`) renames
+# `document-sanity-template` to your project's slug and rewrites the
+# description.
+name = "document-sanity-template"
+version = "0.1.0"
+description = "Starter project for document-sanity: a manuscript and a proposal built from markdown. Clone or use as a GitHub template."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}            # TEMPLATE: adjust or remove
+
+# document-sanity is the only runtime dependency, pinned to a release tag so
+# every clone builds with the same tool. To upgrade, change the tag below to a
+# newer release (https://github.com/yakaboskic/document-sanity/releases) and
+# run `uv lock && uv sync`.
+dependencies = [
+    "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Required for the `git+` direct reference to resolve.
+[tool.hatch.metadata]
+allow-direct-references = true
+
+# This repo has no importable Python — it's purely manuscript content that
+# consumes the document-sanity CLI. Skip hatchling's src-tree autodetection.
+[tool.hatch.build.targets.wheel]
+bypass-selection = true

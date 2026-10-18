@@ -1,0 +1,7 @@
+Milestone,Months,Deliverable,Success Criterion
+M1: Vacuum profile sweep,1-2,Sinter parameter map (vacuum),Coupons at >=25 MPa in vacuum
+M2: Recoater redesign,3-4,Blade + purge-knife prototype,<2% recoater bind rate over 50 layers
+M3: QC pipeline,5-6,Inline classifier + training set,>=95% sensitivity / <2% FP rate
+M4: Integrated print campaign,7-8,Five 200x200x100 mm test articles,All five pass dimensional + strength QC
+M5: Environmental stress testing,9-10,Diurnal cycle survival,Test articles pass 30 thermal cycles
+M6: Final demonstration,11-12,Flight-qualifiable subsystem package,TRL 6 review with NASA stakeholders

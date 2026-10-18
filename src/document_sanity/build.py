@@ -23,6 +23,43 @@ from .variable_processor import VariableProcessor
 from .md2latex import convert_md_file, md_to_latex
 
 
+# The LaTeX template a build falls back to when templates/<name>.tex is missing.
+ARTICLE_TEMPLATE = """\
+% document-sanity article template
+% This template is assembled automatically by the build system.
+% Insertion points are marked with %%DOCUMENT_SANITY: comments.
+
+\\documentclass[12pt, a4paper]{article}
+
+% Standard packages
+\\usepackage[margin=1in]{geometry}
+\\usepackage{graphicx}
+\\usepackage{amsmath,amssymb}
+\\usepackage{hyperref}
+\\usepackage{booktabs}
+\\usepackage{longtable}
+\\usepackage{listings}
+\\usepackage{xcolor}
+\\usepackage{float}
+\\usepackage{subcaption}
+\\usepackage{natbib}
+
+%%DOCUMENT_SANITY:PACKAGES
+
+\\begin{document}
+
+%%DOCUMENT_SANITY:TITLE
+
+%%DOCUMENT_SANITY:ABSTRACT
+
+%%DOCUMENT_SANITY:CONTENT
+
+%%DOCUMENT_SANITY:BIBLIOGRAPHY
+
+\\end{document}
+"""
+
+
 class ManuscriptBuilder:
     """Build a manuscript from src/ to out/."""
 
@@ -74,8 +111,7 @@ class ManuscriptBuilder:
         template_path = self.templates_dir / f"{template_name}.tex"
 
         if not template_path.exists():
-            # Fall back to built-in article template
-            from .init import ARTICLE_TEMPLATE
+            # Fall back to the built-in article template
             return ARTICLE_TEMPLATE
 
         return template_path.read_text(encoding='utf-8')
