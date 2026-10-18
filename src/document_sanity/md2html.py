@@ -357,17 +357,18 @@ def _convert_inline(text: str,
         return f'<a href="{_escape(u)}"{title_attr}>{_escape(t)}</a>'
     text = _LINK_RE.sub(_lnk, text)
 
-    # Emphasis is bounded to a single line. Paragraphs reach this function as
-    # their source lines joined by '\n' (step 8 turns those into <br/>), so
-    # WITHOUT this bound a stray single '*' would let a non-greedy match run
-    # across line breaks and swallow everything up to the next loose asterisk
-    # into one <em>. Keeping '.' newline-insensitive (no re.DOTALL) confines
-    # bold spans to a line; the italic class excludes '\n' explicitly.
+    # Emphasis follows CommonMark's flanking rule: an opening delimiter is not
+    # followed by whitespace and a closing one is not preceded by it.
+    # Paragraphs reach this function with their soft-wrapped source lines
+    # joined by spaces, so WITHOUT the rule a stray '**' or '*' would let a
+    # non-greedy match swallow everything up to the next loose delimiter into
+    # one <strong> or <em>. Spans also stay within one line: '.' is
+    # newline-insensitive (no re.DOTALL) and the italic class excludes '\n'.
     # bold+italic ***...***
-    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text)
-    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'\*\*\*(?=\S)(.+?)(?<=\S)\*\*\*', r'<strong><em>\1</em></strong>', text)
+    text = re.sub(r'\*\*(?=\S)(.+?)(?<=\S)\*\*', r'<strong>\1</strong>', text)
     # italic *...*
-    text = re.sub(r'(?<!\w)\*([^*\n]+)\*(?!\w)', r'<em>\1</em>', text)
+    text = re.sub(r'(?<!\w)\*(?=\S)([^*\n]+)(?<=\S)\*(?!\w)', r'<em>\1</em>', text)
 
     # 7. Restore protected placeholders. Inner items (variables) may be nested
     # inside outer items (math), so restore OUTER first, then iterate both until
