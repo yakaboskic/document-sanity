@@ -15,8 +15,7 @@ Part of [Sanitism](https://sanitism.dev): built for autists to communicate their
 **Just give me a folder.** No clone, no git. It needs [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1" \
-  document-sanity init my-paper --title "My paper"
+uvx document-sanity init my-paper --title "My paper"
 ```
 
 ```bash
@@ -317,16 +316,20 @@ document-sanity = { path = "../document-sanity", editable = true }
 
 Paper repos and the template pin release tags, so a change reaches them
 only through a release. Each release also carries a snapshot of the template
-(for `init`), so the two move together:
+(for `init`), so the two move together. Publishing a GitHub release puts the
+version on [PyPI](https://pypi.org/project/document-sanity/), which is where
+`uvx document-sanity` gets it. PyPI takes uploads only from `release.yml` in
+this repo's `pypi` environment (a trusted publisher, set up once), so no
+token is stored anywhere.
 
 1. Bump the version in four places: `version` in `pyproject.toml`,
    `__version__` in `src/document_sanity/__init__.py`, `metadata.version`
    in `skills/document-sanity/SKILL.md`, and `version` in
    `.claude-plugin/plugin.json` (`tests/test_skill.py` fails until they
-   agree). Update the tags in the snippets above and in the skill's `init`
-   mode.
+   agree). Update the versions in the snippets above (the `@X.Y.Z` pin, the
+   git+ fallback, the dependency line) and in the skill's `init` mode.
 2. In `document-sanity-template`, move the pin to the new tag (the
-   `pyproject.toml` dependency line and the README's `uvx` line), regenerate
+   `pyproject.toml` dependency line and any version in the README), regenerate
    the demo workflow with `document-sanity pages init --yes --force
    --only-repo yakaboskic/document-sanity-template`, and commit.
 3. Back here, refresh the snapshot from that commit and commit it:
@@ -339,6 +342,13 @@ only through a release. Each release also carries a snapshot of the template
    git tag -a vX.Y.Z -m "vX.Y.Z — summary" && git push origin vX.Y.Z
    gh release create vX.Y.Z --verify-tag --title "vX.Y.Z — summary" --notes-file notes.md
    ```
+   Publishing the release runs [`release.yml`](.github/workflows/release.yml):
+   it checks the tag is the `pyproject.toml` version, runs the tests, builds
+   the sdist and wheel, starts a project from the wheel, and uploads both to
+   PyPI. Once it's green, `uvx document-sanity@X.Y.Z --version` prints the
+   new version. If it fails, nothing was uploaded: fix it on `main`, delete
+   the release and the tag, and cut them again. PyPI never takes the same
+   version twice, so once it's up, a fix is a new patch release.
 5. In the template, once the tag exists: `uv lock` (it resolves the new tag),
    `make check`, commit `uv.lock`, and push. The Pages workflow (which installs
    with `--locked`) deploys the demo. The snapshot still carries the previous

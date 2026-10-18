@@ -2,9 +2,25 @@
 name = "document-sanity"
 version = "0.2.1"
 description = "Build PDF (LaTeX), interactive HTML, and Word (.docx) documents from a single Markdown source of truth — with variable substitution, figure management, and versioned builds."
-readme = "README.md"
+# readme: dynamic, README.md with its relative links made absolute for PyPI
+# (see [tool.hatch.metadata.hooks.fancy-pypi-readme] below).
+dynamic = ["readme"]
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Chase Yakaboski" }]
+keywords = ["latex", "markdown", "word", "docx", "manuscripts", "provenance", "sanitism"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Text Processing :: Markup :: LaTeX",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
 dependencies = [
     "coolname>=4.0.0",
     "pyyaml>=6.0",
@@ -15,6 +31,14 @@ dependencies = [
     "pillow>=10.0.0",
     "numpy>=1.24",
 ]
+
+[project.urls]
+Homepage = "https://sanitism.dev"
+Documentation = "https://github.com/yakaboskic/document-sanity/tree/main/docs"
+Repository = "https://github.com/yakaboskic/document-sanity"
+Issues = "https://github.com/yakaboskic/document-sanity/issues"
+Changelog = "https://github.com/yakaboskic/document-sanity/releases"
+Demo = "https://document.sanitism.dev"
 
 [project.scripts]
 document-sanity = "document_sanity.cli:main"
@@ -27,8 +51,40 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27", "hatch-fancy-pypi-readme>=24.1"]
 build-backend = "hatchling.build"
+
+# The PyPI page is the README, but pypi.org can't follow its relative links
+# (docs/…, .github/…) or in-page anchors, so they're pointed at GitHub there.
+# Other `](…)` in the README are code samples and stay as they are; so does
+# the README in the repo.
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\(#'
+replacement = '](https://github.com/yakaboskic/document-sanity#'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((?:\./)?((?:docs|\.github)(?:/[^)]*)?)\)'
+replacement = '](https://github.com/yakaboskic/document-sanity/blob/main/\1)'
+
+# Only what a source build needs (and its tests): nothing local or untracked
+# from the working tree, like .claude/settings.local.json.
+[tool.hatch.build.targets.sdist]
+include = [
+    "/README.md",
+    "/src",
+    "/skills",
+    "/tests",
+    "/docs",
+    "/scripts",
+    "/.claude-plugin",
+    "/uv.lock",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/document_sanity"]

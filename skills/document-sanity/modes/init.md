@@ -14,18 +14,26 @@ Ask the user (one message, all at once, with defaults):
 - whether they want git (`--git`). Without it the folder has no `.git`, which
   is fine for people who don't want GitHub.
 
-Then run the tool straight from its release, no install needed:
+Then run the newest release from PyPI, no install needed:
 
 ```bash
-uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1" \
-  document-sanity init DIR --yes \
+uvx document-sanity@latest init DIR --yes \
   --title "Title" --author "Name" --email "me@lab.org" --starter manuscript
 ```
 
-Use the newest release tag (https://github.com/yakaboskic/document-sanity/releases)
-rather than the one written here, if it's newer. A lab that keeps its own fork
-of the template adds `--from gh:owner/repo[@ref]`. `GH_TOKEN` must be set for a
-private fork.
+`@latest` makes uvx check PyPI for a newer release instead of reusing a copy
+it cached earlier. The short form people type, `uvx document-sanity init DIR`,
+does the same on a machine that hasn't run it before. If PyPI can't be
+reached, or the user wants a GitHub release, run it from a tag
+(https://github.com/yakaboskic/document-sanity/releases) instead:
+
+```bash
+uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1" \
+  document-sanity init DIR --yes --title "Title" --starter manuscript
+```
+
+A lab that keeps its own fork of the template adds
+`--from gh:owner/repo[@ref]`. `GH_TOKEN` must be set for a private fork.
 
 `--title` and the author go into every starter's `manifest.yaml`
 (`metadata.title`, `metadata.authors`); the project name (default: the
