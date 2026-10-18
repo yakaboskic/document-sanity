@@ -86,9 +86,10 @@ vX.Y.Z was released with, and its dependency line is pinned back to vX.Y.Z.
   A folder that already has documents under `src/` is refused outright
   (`skills` refreshes the skill; `new-version` adds a document).
 - **`--git`** adds `git init` and a first commit. Without it there's no `.git`.
-- **`uv.lock`** isn't copied: the template's lock is always one release
-  behind the snapshot's pin. The project's first `uv sync` writes a lock for
-  the pinned tag. Commit it; the Pages workflow installs with `--locked`.
+- **`uv.lock`** is left out, `--in-place` included: the template's lock is
+  one release behind the snapshot's pin, and renaming the project renames its
+  root package. The project's first `uv sync` writes a lock for the pinned
+  tag. Commit it; the Pages workflow installs with `--locked`.
 - **`--from gh:owner/repo[@ref]`** starts from a GitHub tarball instead, e.g.
   your lab's fork of the template. No git binary needed; `GH_TOKEN` (or
   `GITHUB_TOKEN`) reaches a private fork. A fork's own pin is left alone.
@@ -292,8 +293,8 @@ only through a release. Each release also carries a snapshot of the template
 5. In the template, once the tag exists: `uv lock` (it resolves the new tag),
    `make check`, commit `uv.lock`, and push. The Pages workflow (which installs
    with `--locked`) deploys the demo. The snapshot still carries the previous
-   lock, which is why `init` doesn't copy `uv.lock`: a new project's first
-   `uv sync` writes its own.
+   lock, one reason `init` leaves `uv.lock` out (in every mode): a new
+   project's first `uv sync` writes its own.
 
 ## Project layout
 

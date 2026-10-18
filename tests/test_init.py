@@ -4,6 +4,7 @@ import io
 import os
 import re
 import shutil
+import socket
 import subprocess
 import tarfile
 from pathlib import Path
@@ -228,43 +229,89 @@ def test_gitignore_keeps_uv_lock(tmp_path: Path) -> None:
     assert ignored.returncode == 1, "uv.lock is gitignored"
 
 
-@pytest.mark.skipif(
+def _online(host: str = "pypi.org") -> bool:
+    try:
+        socket.create_connection((host, 443), timeout=3).close()
+        return True
+    except OSError:
+        return False
+
+
+needs_uv = pytest.mark.skipif(
     shutil.which("uv") is None or shutil.which("git") is None, reason="needs uv and git"
 )
-@pytest.mark.skipif(not re.fullmatch(r"\d+\.\d+\.\d+", __version__), reason="not a release version")
-def test_first_lock_resolves_the_pinned_tag(tmp_path: Path) -> None:
-    """The lock a new project's first `uv sync` writes pins the release that made it.
+needs_pypi = pytest.mark.skipif(not _online(), reason="offline (uv lock resolves from PyPI)")
 
-    GitHub stands in as a local bare clone of this checkout, tagged v<version>
-    (git's insteadOf), so this works before the tag is pushed. PyPI
-    packages come from uv's cache or the index.
+
+def local_github(tmp_path: Path, tag: str) -> dict[str, str]:
+    """Env in which document-sanity's GitHub URL is a local bare clone with `tag` at HEAD.
+
+    git's insteadOf points uv at it, so a lock for a tag that isn't pushed yet
+    still resolves. PyPI packages come from uv's cache or the index.
     """
     repo = Path(__file__).resolve().parent.parent
     if not (repo / ".git").exists():
         pytest.skip("not a git checkout")
     remote = tmp_path / "remote.git"
-    subprocess.run(["git", "clone", "-q", "--bare", str(repo), str(remote)], check=True)
-    subprocess.run(["git", "-C", str(remote), "tag", "-f", f"v{__version__}", "HEAD"],
-                   check=True, capture_output=True)
+    if not remote.exists():
+        subprocess.run(["git", "clone", "-q", "--bare", str(repo), str(remote)], check=True)
+    subprocess.run(["git", "-C", str(remote), "tag", "-f", tag, "HEAD"], check=True, capture_output=True)
     gitconfig = tmp_path / "gitconfig"
     gitconfig.write_text(
         f'[url "file://{remote}"]\n'
         "\tinsteadOf = https://github.com/yakaboskic/document-sanity.git\n"
     )
-    env = {**os.environ, "GIT_CONFIG_GLOBAL": str(gitconfig), "GIT_CONFIG_NOSYSTEM": "1",
-           "UV_NO_GITHUB_FAST_PATH": "1"}
+    return {**os.environ, "GIT_CONFIG_GLOBAL": str(gitconfig), "GIT_CONFIG_NOSYSTEM": "1",
+            "UV_NO_GITHUB_FAST_PATH": "1"}
 
+
+def uv_lock(project: Path, env: dict[str, str], *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["uv", "lock", *args], cwd=project, env=env, capture_output=True, text=True)
+
+
+def pinned_tag(project: Path) -> str:
+    return re.search(r"document-sanity\.git@([^\"]+)", (project / "pyproject.toml").read_text()).group(1)
+
+
+@needs_uv
+@needs_pypi
+@pytest.mark.skipif(not re.fullmatch(r"\d+\.\d+\.\d+", __version__), reason="not a release version")
+def test_first_lock_resolves_the_pinned_tag(tmp_path: Path) -> None:
+    """The lock a new project's first `uv sync` writes pins the release that made it."""
+    env = local_github(tmp_path, f"v{__version__}")
     dest = tmp_path / "x"
     ip.create_project(dest, answers(), skills=False)
     assert not (dest / "uv.lock").exists()
-    lock = subprocess.run(["uv", "lock"], cwd=dest, env=env, capture_output=True, text=True)
+    assert pinned_tag(dest) == f"v{__version__}"
+    lock = uv_lock(dest, env)
     assert lock.returncode == 0, lock.stderr
-    text = (dest / "uv.lock").read_text()
-    pinned = f"document-sanity.git?rev=v{__version__}#"
-    assert pinned in text, text[:2000]
-    # what CI's `uv sync --locked` checks first
-    locked = subprocess.run(["uv", "lock", "--locked"], cwd=dest, env=env, capture_output=True, text=True)
+    assert f"document-sanity.git?rev=v{__version__}#" in (dest / "uv.lock").read_text()
+    locked = uv_lock(dest, env, "--locked")  # what CI's `uv sync --locked` checks first
     assert locked.returncode == 0, locked.stderr
+
+
+@needs_uv
+@needs_pypi
+def test_in_place_drops_the_lock_its_rename_would_break(tmp_path: Path) -> None:
+    """After `init.py`, the template's own lock fails --locked; a fresh one passes."""
+    root = template_copy(tmp_path)
+    env = local_github(tmp_path, pinned_tag(root))
+    assert uv_lock(root, env).returncode == 0  # the template repo's lock: current
+    template_lock = (root / "uv.lock").read_bytes()
+    assert uv_lock(root, env, "--locked").returncode == 0
+
+    ip.init_in_place(root, answers(), skills=False)
+    assert not (root / "uv.lock").exists()
+
+    (root / "uv.lock").write_bytes(template_lock)  # had it stayed…
+    stale = uv_lock(root, env, "--locked")
+    assert stale.returncode != 0 and "needs to be updated" in stale.stderr
+    (root / "uv.lock").unlink()
+
+    fresh = uv_lock(root, env)  # what the project's first `uv sync` does
+    assert fresh.returncode == 0, fresh.stderr
+    assert 'name = "demo-paper"' in (root / "uv.lock").read_text()
+    assert uv_lock(root, env, "--locked").returncode == 0
 
 
 # ── --in-place (the template's init.py) ─────────────────────────────────────
@@ -291,8 +338,7 @@ def test_in_place_renames_and_removes_template_files(tmp_path: Path) -> None:
     assert not (root / ".github").exists()  # no empty folders left behind
     assert (root / ".claude/skills/document-sanity/SKILL.md").is_file()
     assert (root / "README.md").read_text().startswith("# demo-paper")
-    # the template repo's own lock is current: in place, it stays
-    assert (root / "uv.lock").read_bytes() == ip.bundled_template()[0]["uv.lock"]
+    assert not (root / "uv.lock").exists()  # renamed project, stale lock: gone
     # a second run finds nothing to initialize
     assert main(["init", str(root), "--in-place", *ANSWERS]) == 1
 
