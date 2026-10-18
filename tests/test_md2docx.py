@@ -81,5 +81,7 @@ def test_fence_without_preview_does_not_swallow_a_later_preview(tmp_path):
     builder, text = _render(tmp_path, md)
 
     assert "Between the blocks." in text
-    assert "E = mc^2" in text
+    # the equation renders as Office Math (pandoc) or, without pandoc, as its LaTeX source
+    xml = builder.to_xml()
+    assert "<m:oMathPara>" in xml or "E = mc^2" in text
     assert len(builder.pending_images) == 1

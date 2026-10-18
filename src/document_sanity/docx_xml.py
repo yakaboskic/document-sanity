@@ -43,6 +43,7 @@ class RichText:
     size: Optional[int] = None
     rstyle: Optional[str] = None  # character-style id (e.g. "Code")
     vert_align: Optional[str] = None  # "superscript" | "subscript"
+    omml: Optional[str] = None  # an <m:oMath> written in place of the run (inline math)
 
 
 def _pick(*vals):
@@ -159,6 +160,9 @@ def create_paragraph(
     else:
         parts: list[str] = []
         for part in content:
+            if part.omml:
+                parts.append(part.omml)
+                continue
             parts.append(
                 create_run(
                     part.text,
@@ -218,6 +222,9 @@ def create_table(
         # filled in for any unset attribute.
         parts: list[str] = []
         for rt in cell:
+            if rt.omml:
+                parts.append(rt.omml)
+                continue
             parts.append(create_run(
                 rt.text,
                 font=_pick(rt.font, font),

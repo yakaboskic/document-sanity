@@ -282,7 +282,7 @@ class ContentBuilder:
         self,
         source: Path,
         *,
-        caption: Optional[str] = None,
+        caption: Optional[str | list[RichText]] = None,
         alt_text: str = "",
         max_width_inches: float = 6.0,
     ) -> "ContentBuilder":
@@ -304,23 +304,27 @@ class ContentBuilder:
             width_emu=width_emu,
             height_emu=height_emu,
         ))
-        self._items.append(create_inline_drawing(
+        drawing = create_inline_drawing(
             rel_id=rel_id,
             pic_id=pic_id,
             filename=media_name,
             width_emu=width_emu,
             height_emu=height_emu,
             alt_text=alt_text,
-        ))
+        )
+        if caption:  # keep the figure on the same page as its caption
+            drawing = drawing.replace("<w:pPr>", "<w:pPr><w:keepNext/>", 1)
+        self._items.append(drawing)
         if caption:
             s = self.styles
+            cap = s.get("caption", {})
             self._items.append(create_paragraph(
                 caption,
-                alignment="center",
+                alignment=cap.get("alignment", "center"),
                 font=s["fonts"]["body"],
                 size=s["fontSizes"]["caption"],
-                color=s["colors"]["textMuted"],
-                italic=True,
+                color=cap.get("color", s["colors"]["textMuted"]),
+                italic=cap.get("italic", True) or None,
                 spacing_after=s["spacing"]["paragraph"]["after"],
             ))
         return self
