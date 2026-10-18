@@ -42,6 +42,13 @@ TEMPLATE_REPO = "yakaboskic/document-sanity-template"
 # it: the bootstrap shim, and the workflow that deploys the template's demo
 # (Pages is opt-in per project — `document-sanity pages init`).
 TEMPLATE_ONLY = ("init.py", ".github/workflows/pages.yml")
+# Never part of a project made from the template: its lock. A copied lock is
+# stale twice over. The snapshot a release ships is taken before the template
+# is re-locked against that release's tag, so it pins the previous tool; and
+# renaming the project (here or `--in-place`) renames the lock's root package.
+# Either way `uv sync --locked` (the Pages workflow) refuses it. The
+# project's first `uv sync` writes its own.
+DROPPED = ("uv.lock",)
 
 SKILL_NAME = "document-sanity"
 # Claude Code reads .claude/skills/; Codex, Pi, Cursor and other agents read
@@ -369,7 +376,7 @@ def render_readme(a: Answers, docs: list[str]) -> str:
     first = docs[0] if docs else "manuscript"
     listing = "\n".join(f"- `src/{d}/`" for d in docs) or "- (none yet)"
     develop = commented([
-        ("uv sync", "installs document-sanity (pinned)"),
+        ("uv sync", "installs document-sanity (pinned), writes uv.lock"),
         (f"uv run document-sanity preview -V {first}", "refresh preview blocks (after every edit)"),
         (f"make pdf VERSION={first}", f"→ out/{first}/pdf/main.pdf (needs TeX)"),
         (f"make html VERSION={first}", f"→ out/{first}/html/index.html"),
@@ -398,7 +405,9 @@ Every folder under `src/` with a `manifest.yaml` is a document:
 ```
 
 `make help` lists the rest. Without `VERSION=`, commands pick the latest
-document under `src/`.
+document under `src/`. Commit the `uv.lock` the first `uv sync` writes: it
+pins every dependency, and the GitHub Pages workflow installs from it with
+`--locked`.
 
 An agent skill lives in `.claude/skills/document-sanity/` (Claude Code:
 `/document-sanity`) and `.agents/skills/document-sanity/` (other agents).
@@ -541,6 +550,7 @@ def create_project(
     """
     bundled = source is None
     files, label = bundled_template() if bundled else source
+    files = {rel: data for rel, data in files.items() if rel not in DROPPED}
     release = re.fullmatch(r"\d+\.\d+\.\d+", __version__) is not None
     files = apply_answers(files, answers, pin=__version__ if bundled and release else None)
     if skills:
@@ -573,8 +583,8 @@ def create_project(
 def init_in_place(root: Path, answers: Answers, *, skills: bool = True, force: bool = False) -> Result:
     """Apply `answers` to a template copy where it stands ("Use this template").
 
-    The same rewrites as `create_project`; starters you don't keep and the
-    template-only files are removed.
+    The same rewrites as `create_project`; starters you don't keep, the
+    template-only files and the template's lock are removed.
     """
     if not (root / "init.py").is_file() or not (root / "pyproject.toml").is_file():
         raise InitError(
@@ -602,8 +612,8 @@ def init_in_place(root: Path, answers: Answers, *, skills: bool = True, force: b
         raise conflict_error(p)
     write(files, root, p.create + p.conflicts)
 
-    removed = [rel for rel in TEMPLATE_ONLY if (root / rel).is_file()]
-    for rel in TEMPLATE_ONLY:
+    removed = [rel for rel in (*TEMPLATE_ONLY, *DROPPED) if (root / rel).is_file()]
+    for rel in (*TEMPLATE_ONLY, *DROPPED):
         (root / rel).unlink(missing_ok=True)
         _prune_empty_parents(root / rel, root)
     for doc in available:

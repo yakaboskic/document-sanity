@@ -94,7 +94,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     if result.dest.resolve() != Path.cwd().resolve():
         print(f"    cd {result.dest}")
     print(ip.commented([
-        ("uv sync", "document-sanity, pinned"),
+        ("uv sync", "document-sanity, pinned; commit the uv.lock it writes"),
         (f"make html VERSION={first}", f"→ out/{first}/html/index.html"),
         (f"make word VERSION={first}", f"→ out/{first}/word/main.docx"),
         (f"make pdf VERSION={first}", "needs TeX (pdflatex, bibtex)"),

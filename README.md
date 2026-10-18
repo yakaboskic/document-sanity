@@ -62,7 +62,7 @@ One command, no clone and no git:
 uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.0" \
   document-sanity init my-paper --title "My paper" --starter manuscript
 cd my-paper
-uv sync                                  # the pinned document-sanity
+uv sync                                  # the pinned document-sanity; writes uv.lock (commit it)
 make html VERSION=manuscript             # → out/manuscript/html/index.html
 make pdf VERSION=manuscript              # → out/manuscript/pdf/main.pdf (needs TeX)
 uv run document-sanity check             # every target, before you share
@@ -86,6 +86,10 @@ vX.Y.Z was released with, and its dependency line is pinned back to vX.Y.Z.
   A folder that already has documents under `src/` is refused outright
   (`skills` refreshes the skill; `new-version` adds a document).
 - **`--git`** adds `git init` and a first commit. Without it there's no `.git`.
+- **`uv.lock`** is left out, `--in-place` included: the template's lock is
+  one release behind the snapshot's pin, and renaming the project renames its
+  root package. The project's first `uv sync` writes a lock for the pinned
+  tag. Commit it; the Pages workflow installs with `--locked`.
 - **`--from gh:owner/repo[@ref]`** starts from a GitHub tarball instead, e.g.
   your lab's fork of the template. No git binary needed; `GH_TOKEN` (or
   `GITHUB_TOKEN`) reaches a private fork. A fork's own pin is left alone.
@@ -288,8 +292,9 @@ only through a release. Each release also carries a snapshot of the template
    ```
 5. In the template, once the tag exists: `uv lock` (it resolves the new tag),
    `make check`, commit `uv.lock`, and push. The Pages workflow (which installs
-   with `--locked`) deploys the demo. The snapshot keeps the previous lock;
-   `uv sync` in a new project re-locks it.
+   with `--locked`) deploys the demo. The snapshot still carries the previous
+   lock, one reason `init` leaves `uv.lock` out (in every mode): a new
+   project's first `uv sync` writes its own.
 
 ## Project layout
 
