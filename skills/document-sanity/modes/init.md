@@ -28,7 +28,7 @@ reached, or the user wants a GitHub release, run it from a tag
 (https://github.com/yakaboskic/document-sanity/releases) instead:
 
 ```bash
-uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.1" \
+uvx --from "document-sanity @ git+https://github.com/yakaboskic/document-sanity.git@v0.2.2" \
   document-sanity init DIR --yes --title "Title" --starter manuscript
 ```
 

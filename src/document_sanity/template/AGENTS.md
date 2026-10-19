@@ -35,9 +35,9 @@ source is [skills/document-sanity/](https://github.com/yakaboskic/document-sanit
   <new>` rather than overwriting one.
 - Both share `templates/article.docx`, `styles/article.yaml` and
   `styles/article.css`. Changing them changes every document; ask first.
-- `make word` runs `scripts/finalize_word_layout.py` after the Word build
-  (table, heading and figure pagination, equation sizing). `check` and `site`
-  run it too. Fix layout there, not in the output.
+- `document-sanity word` lays the file out itself (table, heading and figure
+  pagination, equation sizing), so `make word`, `check` and `site` all get it.
+  Fix layout in the sources or `styles/`, never in `out/`.
 - The Makefile is the human interface: `make help`. When you add a target,
   add it to the README's table.
 

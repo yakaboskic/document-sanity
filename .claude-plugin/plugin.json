@@ -1,6 +1,6 @@
 {
   "name": "document-sanity",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Papers and proposals from markdown and one manifest.yaml per document: PDF via LaTeX, an interactive HTML viewer and Word, every number with provenance. /document-sanity [init | onboard | iterate | figures | variables | cite | word | version | import | check | deploy]. Part of Sanitism.",
   "author": {
     "name": "yakaboskic",

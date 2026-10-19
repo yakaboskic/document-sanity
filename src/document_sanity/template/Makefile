@@ -18,8 +18,8 @@ help:
 	@echo "  site           Every document's HTML, PDF and Word in site/ (what Pages publishes)"
 	@echo "  clean          Remove out/ and site/"
 	@echo ""
-	@echo "Pass VERSION=<ver> to any target for a specific dated version; otherwise"
-	@echo "document-sanity auto-detects the latest src/<ver>/ directory."
+	@echo "Pass VERSION=<name> to any target for a specific document; otherwise"
+	@echo "document-sanity auto-detects the latest src/<name>/ directory."
 
 # document-sanity is pinned to a release tag in pyproject.toml. To upgrade,
 # change the tag and run `make update` (or `uv lock && uv sync`).
@@ -53,7 +53,6 @@ html: preview
 
 word: preview
 	uv run document-sanity word $(if $(VERSION),--version $(VERSION))
-	uv run python scripts/finalize_word_layout.py $(if $(VERSION),--version "$(VERSION)")
 
 serve: html
 	@ver=$${VERSION:-$$(ls -1 out | grep -E '^[0-9]{8}' | sort -r | head -1)}; \
