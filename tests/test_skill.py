@@ -42,7 +42,7 @@ def _commands() -> set[str]:
 def test_modes_only_mention_real_commands() -> None:
     skill = bundled_skill()
     text = "\n".join(skill[k].decode() for k in skill if k.endswith(".md"))
-    used = set(re.findall(r"(?:uv run|uvx --from \S+) document-sanity ([a-z][a-z-]*)", text))
+    used = set(re.findall(r"(?:uv run|uvx(?: --from \S+)?) document-sanity(?:@\S+)? ([a-z][a-z-]*)", text))
     used |= set(re.findall(r"\n\s*document-sanity ([a-z][a-z-]*)(?=\s)", text))
     assert used and used <= _commands(), used - _commands()
 
