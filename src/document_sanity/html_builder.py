@@ -35,6 +35,7 @@ from .md2html import md_to_html
 from .bib import load_bib, render_entry_html, BibEntry
 from .figure_crop import copy_with_crop, pillow_available
 from .labels import collect_labels
+from .verbatim import mask_code, unmask_code
 
 
 def _normalize_plotly_html_figures(figures_dir: Path, verbose: bool = False) -> None:
@@ -1147,7 +1148,9 @@ def build_html(root_dir: Path, version: str, open_browser: bool = False,
                     return f'![{alt}](figures/{resolved.name})'
             # No manifest entry: just do the ../figures/ → figures/ rewrite
             return f'![{alt}]({path.replace("../figures/", "figures/")})'
-        return _IMAGE_RE.sub(_sub, md)
+        # An image in code is an example to show as written, not a figure.
+        md, code = mask_code(md)
+        return unmask_code(_IMAGE_RE.sub(_sub, md), code)
 
     section_htmls: list[str] = []
     pseudo = {'_bibliography', '_toc'}

@@ -44,6 +44,7 @@ from .labels import collect_labels
 from .manifest import Manifest, resolve_figure
 from .md2docx import render_markdown, render_notice
 from .variable_processor import VariableProcessor
+from .verbatim import mask_code, unmask_code
 
 
 class WordBuilder:
@@ -195,13 +196,17 @@ class WordBuilder:
 
         c.spacer()
 
+    def _replace_variables(self, md: str, where: str) -> str:
+        """{{VAR}}s filled in everywhere but in code: `{{VAR}}` is shown as
+        written, as LaTeX and HTML show it."""
+        md, code = mask_code(md)
+        return unmask_code(self.processor.replace_variables(md, where), code)
+
     def _add_abstract(self, doc: TemplateDocument) -> None:
         abs_text = self.manifest.metadata.abstract
         if not abs_text:
             return
-        body = self.processor.replace_variables(
-            abs_text.strip(), "manifest.yaml:abstract"
-        )
+        body = self._replace_variables(abs_text.strip(), "manifest.yaml:abstract")
         c = doc.content
         c.label("Abstract")
         # Pre-resolve variables then render as markdown so any formatting
@@ -216,7 +221,7 @@ class WordBuilder:
         notice = self.manifest.metadata.notice
         if not notice:
             return
-        text = self.processor.replace_variables(notice.strip(), "manifest.yaml:notice")
+        text = self._replace_variables(notice.strip(), "manifest.yaml:notice")
         render_notice(text, doc.content)
 
     def _render_sections(self, doc: TemplateDocument) -> None:
@@ -251,9 +256,12 @@ class WordBuilder:
             content = src_path.read_text(encoding="utf-8")
             # Expand {{tab:id}} on the raw markdown so md2docx sees a
             # native pipe table (consistent with the LaTeX/HTML paths).
+            # Code is verbatim, so neither this nor the {{VAR}} pass reaches it.
             from .manifest import expand_table_tokens
+            content, code = mask_code(content)
             content = expand_table_tokens(content, self.manifest.tables, self.src_dir)
-            content = self.processor.replace_variables(content, str(src_path))
+            content = unmask_code(content, code)
+            content = self._replace_variables(content, str(src_path))
             render_markdown(
                 content,
                 doc.content,
